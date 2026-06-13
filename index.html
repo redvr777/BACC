@@ -46,7 +46,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .track .ico{font-size:13px;color:var(--muted);width:16px;text-align:center;flex-shrink:0;}
 .track.playing .ico{color:var(--accent);}
 .track-info{flex:1;min-width:0;}
-.track .tname{font-family:'VT323',monospace;font-size:21px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;}
+.track .tname{
+  font-family:'VT323',monospace;
+  font-size:21px;
+  font-weight:700;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;
+}
 .track.playing .tname{color:var(--gold);text-shadow:0 0 6px var(--gold);}
 .track .ext{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:3px 6px;flex-shrink:0;border-radius:1px;}
 .empty{text-align:center;padding:60px 16px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);line-height:2.2;}
@@ -55,7 +60,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .bar-np{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:10px;}
 .bar-np-text{min-width:0;flex:1;}
 .bar-np-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--pink);text-shadow:0 0 5px var(--pink);letter-spacing:.05em;margin-bottom:3px;}
-.bar-np-name{font-family:'VT323',monospace;font-size:20px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-np-name{font-family:'VT323',monospace;font-size:20px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bar-vol{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .vol-lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);}
 input[type=range]{-webkit-appearance:none;appearance:none;height:4px;background:var(--bg3);border:1px solid var(--border2);outline:none;cursor:pointer;border-radius:1px;}
@@ -74,6 +79,25 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
 .tbtn.pp{width:56px;height:56px;background:var(--pink);color:#1a0822;border:none;font-size:22px;box-shadow:3px 3px 0 #8b0033;}
 .tbtn.pp:hover{background:#e0007a;color:#1a0822;}
 .tbtn.loop.on{border-color:var(--gold);color:var(--gold);}
+
+.restore-banner{
+  display:none;
+  flex-shrink:0;
+  background:var(--bg3);
+  border-bottom:1px solid var(--border2);
+  padding:8px 16px;
+  font-family:'Press Start 2P',monospace;
+  font-size:7px;
+  color:var(--gold);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.restore-banner span{line-height:1.8;}
+.restore-banner button{
+  background:var(--pink);color:#1a0822;border:none;
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  padding:5px 8px;cursor:pointer;border-radius:1px;flex-shrink:0;
+}
+.restore-banner.hidden{display:none!important;}
 
 @media(max-width:400px){
   .hero{padding:16px 14px 14px;}
@@ -96,6 +120,15 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
       <div class="hero-sub">redvr777 / BACC</div>
     </div>
   </div>
+
+  <div class="restore-banner hidden" id="restoreBanner">
+    <span id="restoreMsg">Restore last session?</span>
+    <div style="display:flex;gap:6px;">
+      <button id="restoreYes">RESUME</button>
+      <button id="restoreNo" style="background:var(--bg2);color:var(--muted);border:1px solid var(--border2);">DISMISS</button>
+    </div>
+  </div>
+
   <div class="status-bar" id="statusBar">
     <div class="dot"></div>
     <span id="statusTx">Scanning repo for audio files…</span>
@@ -128,32 +161,215 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
   </div>
 </div>
 <audio id="aud"></audio>
+
 <script>
-var REPO='redvr777/BACC',BRANCH='main',EXTS=['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
-var tracks=[],cur=-1,seeking=false;
-var aud=document.getElementById('aud'),tlist=document.getElementById('tlist'),npName=document.getElementById('npName'),heroTitle=document.getElementById('heroTitle'),btnPP=document.getElementById('btnPP'),btnPrev=document.getElementById('btnPrev'),btnNext=document.getElementById('btnNext'),btnLoop=document.getElementById('btnLoop'),seek=document.getElementById('seek'),tCur=document.getElementById('tCur'),tDur=document.getElementById('tDur'),vol=document.getElementById('vol'),statusBar=document.getElementById('statusBar'),statusTx=document.getElementById('statusTx');
-aud.volume=0.7;
-function setStatus(t,m){statusBar.className='status-bar '+t;statusTx.textContent=m;}
-function fmt(s){if(!s||isNaN(s))return'0:00';var m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;}
-function extOf(p){return(p.split('.').pop()||'').toLowerCase();}
-function cleanName(p){var n=p.split('/').pop().replace(/\.[^.]+$/,'');return decodeURIComponent(n).replace(/[_+]/g,' ');}
-function rawUrl(p){return'https://raw.githubusercontent.com/'+REPO+'/'+BRANCH+'/'+encodeURI(p);}
-function render(){tlist.innerHTML='';if(!tracks.length){var d=document.createElement('div');d.className='empty';d.textContent='No audio files found in this repo.';tlist.appendChild(d);return;}tracks.forEach(function(t,i){var div=document.createElement('div');div.className='track'+(i===cur?' playing':'');div.innerHTML='<span class="num">'+(i+1<10?'0'+(i+1):i+1)+'</span><span class="ico">'+(i===cur&&!aud.paused?'⏸':'▶')+'</span><div class="track-info"><div class="tname">'+t.name+'</div></div><span class="ext">'+t.ext+'</span>';div.addEventListener('click',function(){playTrack(i);});tlist.appendChild(div);});}
-function playTrack(i){if(i<0||i>=tracks.length)return;cur=i;aud.src=tracks[i].url;aud.play().catch(function(){});npName.textContent=tracks[i].name;heroTitle.textContent=tracks[i].name;btnPP.textContent='⏸';render();var el=tlist.querySelectorAll('.track')[i];if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});}
-function loadTracks(){fetch('https://api.github.com/repos/'+REPO+'/git/trees/'+BRANCH+'?recursive=1').then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(data){if(!data.tree)throw new Error('No tree in response');tracks=[];data.tree.forEach(function(item){if(item.type!=='blob')return;var ext=extOf(item.path);if(EXTS.indexOf(ext)===-1)return;tracks.push({name:cleanName(item.path),url:rawUrl(item.path),ext:ext});});if(!tracks.length)setStatus('err','No audio files found in '+REPO);else setStatus('ok',tracks.length+' track'+(tracks.length===1?'':'s')+' loaded');render();}).catch(function(e){if(BRANCH==='main'){BRANCH='master';setStatus('','Retrying on master branch…');loadTracks();return;}setStatus('err','Could not load repo: '+e.message);render();});}
-btnPP.addEventListener('click',function(){if(cur<0&&tracks.length)return playTrack(0);if(aud.paused){aud.play().catch(function(){});btnPP.textContent='⏸';}else{aud.pause();btnPP.textContent='▶';}render();});
-btnPrev.addEventListener('click',function(){if(tracks.length)playTrack(cur<=0?tracks.length-1:cur-1);});
-btnNext.addEventListener('click',function(){if(tracks.length)playTrack(cur>=tracks.length-1?0:cur+1);});
-btnLoop.addEventListener('click',function(){aud.loop=!aud.loop;btnLoop.classList.toggle('on',aud.loop);});
-aud.addEventListener('ended',function(){if(!aud.loop)btnNext.click();});
-aud.addEventListener('play',function(){btnPP.textContent='⏸';render();});
-aud.addEventListener('pause',function(){btnPP.textContent='▶';render();});
-aud.addEventListener('loadedmetadata',function(){seek.max=aud.duration||0;tDur.textContent=fmt(aud.duration);});
-aud.addEventListener('timeupdate',function(){if(!seeking){seek.value=aud.currentTime;tCur.textContent=fmt(aud.currentTime);}});
-seek.addEventListener('mousedown',function(){seeking=true;});
-seek.addEventListener('input',function(){tCur.textContent=fmt(Number(seek.value));});
-seek.addEventListener('change',function(){aud.currentTime=Number(seek.value);seeking=false;});
-vol.addEventListener('input',function(){aud.volume=Number(vol.value);});
+var REPO='redvr777/BACC', BRANCH='main';
+var EXTS=['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
+var SAVE_KEY='yuza_session';
+
+var tracks=[], cur=-1, seeking=false, saveTimer=null;
+var aud         = document.getElementById('aud');
+var tlist       = document.getElementById('tlist');
+var npName      = document.getElementById('npName');
+var heroTitle   = document.getElementById('heroTitle');
+var btnPP       = document.getElementById('btnPP');
+var btnPrev     = document.getElementById('btnPrev');
+var btnNext     = document.getElementById('btnNext');
+var btnLoop     = document.getElementById('btnLoop');
+var seek        = document.getElementById('seek');
+var tCur        = document.getElementById('tCur');
+var tDur        = document.getElementById('tDur');
+var vol         = document.getElementById('vol');
+var statusBar   = document.getElementById('statusBar');
+var statusTx    = document.getElementById('statusTx');
+var restoreBanner = document.getElementById('restoreBanner');
+var restoreMsg  = document.getElementById('restoreMsg');
+aud.volume = 0.7;
+
+// ── PERSIST ──────────────────────────────────────────────
+function saveSession() {
+  if (cur < 0) return;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      trackIdx: cur,
+      position: aud.currentTime || 0,
+      volume:   aud.volume,
+      loop:     aud.loop
+    }));
+  } catch(e){}
+}
+function loadSession() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){ return null; }
+}
+function clearSession() {
+  try { localStorage.removeItem(SAVE_KEY); } catch(e){}
+}
+
+// Auto-save position every 3 seconds while playing
+aud.addEventListener('timeupdate', function() {
+  if (!seeking && aud.currentTime > 0) {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSession, 3000);
+  }
+});
+// Save on pause and before leaving
+aud.addEventListener('pause', saveSession);
+window.addEventListener('beforeunload', saveSession);
+window.addEventListener('pagehide', saveSession);
+
+// ── MEDIA SESSION (OS media controls) ────────────────────
+function updateMediaSession() {
+  if (!('mediaSession' in navigator) || cur < 0) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title:  tracks[cur].name,
+    artist: 'redvr777 / BACC',
+    album:  'BACC Soundtrack'
+  });
+  navigator.mediaSession.setActionHandler('play',     function(){ aud.play(); });
+  navigator.mediaSession.setActionHandler('pause',    function(){ aud.pause(); });
+  navigator.mediaSession.setActionHandler('previoustrack', function(){ btnPrev.click(); });
+  navigator.mediaSession.setActionHandler('nexttrack',     function(){ btnNext.click(); });
+  navigator.mediaSession.setActionHandler('seekto', function(d) {
+    if (d.seekTime != null) aud.currentTime = d.seekTime;
+  });
+}
+
+// ── HELPERS ───────────────────────────────────────────────
+function setStatus(t,m){ statusBar.className='status-bar '+t; statusTx.textContent=m; }
+function fmt(s){ if(!s||isNaN(s))return'0:00'; var m=Math.floor(s/60),sec=Math.floor(s%60); return m+':'+(sec<10?'0':'')+sec; }
+function extOf(p){ return (p.split('.').pop()||'').toLowerCase(); }
+function cleanName(p){ var n=p.split('/').pop().replace(/\.[^.]+$/,''); return decodeURIComponent(n).replace(/[_+]/g,' '); }
+function rawUrl(p){ return 'https://raw.githubusercontent.com/'+REPO+'/'+BRANCH+'/'+encodeURI(p); }
+
+// ── RENDER ────────────────────────────────────────────────
+function render(){
+  tlist.innerHTML='';
+  if(!tracks.length){
+    var d=document.createElement('div'); d.className='empty';
+    d.textContent='No audio files found in this repo.'; tlist.appendChild(d); return;
+  }
+  tracks.forEach(function(t,i){
+    var div=document.createElement('div');
+    div.className='track'+(i===cur?' playing':'');
+    div.innerHTML=
+      '<span class="num">'+(i+1<10?'0'+(i+1):i+1)+'</span>'+
+      '<span class="ico">'+(i===cur&&!aud.paused?'⏸':'▶')+'</span>'+
+      '<div class="track-info"><div class="tname">'+t.name+'</div></div>'+
+      '<span class="ext">'+t.ext+'</span>';
+    div.addEventListener('click', function(){ playTrack(i); });
+    tlist.appendChild(div);
+  });
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────
+function playTrack(i, startAt) {
+  if(i<0||i>=tracks.length) return;
+  cur=i;
+  aud.src=tracks[i].url;
+  if (startAt) {
+    aud.addEventListener('loadedmetadata', function onMeta(){
+      aud.currentTime = startAt;
+      aud.removeEventListener('loadedmetadata', onMeta);
+    });
+  }
+  aud.play().catch(function(){});
+  npName.textContent=tracks[i].name;
+  heroTitle.textContent=tracks[i].name;
+  btnPP.textContent='⏸';
+  updateMediaSession();
+  render();
+  var el=tlist.querySelectorAll('.track')[i];
+  if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  saveSession();
+}
+
+// ── RESTORE BANNER ────────────────────────────────────────
+function showRestoreBanner(session) {
+  var name = tracks[session.trackIdx] ? tracks[session.trackIdx].name : 'last track';
+  var pos  = fmt(session.position);
+  restoreMsg.textContent = 'Resume "'+name+'" at '+pos+'?';
+  restoreBanner.classList.remove('hidden');
+  restoreBanner.style.display='flex';
+
+  document.getElementById('restoreYes').onclick = function() {
+    restoreBanner.style.display='none';
+    aud.volume = session.volume;
+    vol.value  = session.volume;
+    aud.loop   = session.loop;
+    btnLoop.classList.toggle('on', aud.loop);
+    playTrack(session.trackIdx, session.position);
+  };
+  document.getElementById('restoreNo').onclick = function() {
+    restoreBanner.style.display='none';
+    clearSession();
+  };
+}
+
+// ── LOAD TRACKS ───────────────────────────────────────────
+function loadTracks(){
+  fetch('https://api.github.com/repos/'+REPO+'/git/trees/'+BRANCH+'?recursive=1')
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(data){
+      if(!data.tree) throw new Error('No tree in response');
+      tracks=[];
+      data.tree.forEach(function(item){
+        if(item.type!=='blob') return;
+        var ext=extOf(item.path);
+        if(EXTS.indexOf(ext)===-1) return;
+        tracks.push({ name:cleanName(item.path), url:rawUrl(item.path), ext:ext });
+      });
+      if(!tracks.length) setStatus('err','No audio files found in '+REPO);
+      else setStatus('ok', tracks.length+' track'+(tracks.length===1?'':'s')+' loaded');
+      render();
+
+      // Restore session after tracks are loaded
+      var session = loadSession();
+      if (session && session.trackIdx >= 0 && session.trackIdx < tracks.length) {
+        // Apply volume immediately even before user confirms
+        aud.volume = session.volume;
+        vol.value  = session.volume;
+        if (session.position > 5) {
+          showRestoreBanner(session);
+        } else {
+          // Short position — just silently restore track selection without autoplay
+          cur = session.trackIdx;
+          npName.textContent = tracks[cur].name;
+          heroTitle.textContent = tracks[cur].name;
+          aud.volume = session.volume;
+          vol.value  = session.volume;
+          aud.loop   = session.loop||false;
+          btnLoop.classList.toggle('on', aud.loop);
+          render();
+        }
+      }
+    })
+    .catch(function(e){
+      if(BRANCH==='main'){ BRANCH='master'; setStatus('','Retrying on master branch…'); loadTracks(); return; }
+      setStatus('err','Could not load repo: '+e.message);
+      render();
+    });
+}
+
+// ── CONTROLS ──────────────────────────────────────────────
+btnPP.addEventListener('click',function(){
+  if(cur<0&&tracks.length) return playTrack(0);
+  if(aud.paused){ aud.play().catch(function(){}); btnPP.textContent='⏸'; }
+  else { aud.pause(); btnPP.textContent='▶'; }
+  render();
+});
+btnPrev.addEventListener('click',function(){ if(tracks.length) playTrack(cur<=0?tracks.length-1:cur-1); });
+btnNext.addEventListener('click',function(){ if(tracks.length) playTrack(cur>=tracks.length-1?0:cur+1); });
+btnLoop.addEventListener('click',function(){ aud.loop=!aud.loop; btnLoop.classList.toggle('on',aud.loop); saveSession(); });
+aud.addEventListener('ended',function(){ if(!aud.loop) btnNext.click(); });
+aud.addEventListener('play',function(){ btnPP.textContent='⏸'; render(); updateMediaSession(); });
+aud.addEventListener('pause',function(){ btnPP.textContent='▶'; render(); });
+aud.addEventListener('loadedmetadata',function(){ seek.max=aud.duration||0; tDur.textContent=fmt(aud.duration); });
+aud.addEventListener('timeupdate',function(){ if(!seeking){ seek.value=aud.currentTime; tCur.textContent=fmt(aud.currentTime); } });
+seek.addEventListener('mousedown',function(){ seeking=true; });
+seek.addEventListener('input',function(){ tCur.textContent=fmt(Number(seek.value)); });
+seek.addEventListener('change',function(){ aud.currentTime=Number(seek.value); seeking=false; saveSession(); });
+vol.addEventListener('input',function(){ aud.volume=Number(vol.value); saveSession(); });
+
 loadTracks();
 </script>
 </body>
