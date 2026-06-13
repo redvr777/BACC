@@ -1,836 +1,167 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crate — Playlist Generator</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 <style>
-  :root{
-    --bg: #15130f;
-    --bg-elevated: #1e1b15;
-    --bg-card: #221f18;
-    --text: #f2ede3;
-    --text-muted: #a39a89;
-    --accent: #e8a33d;
-    --accent-dim: rgba(232,163,61,0.16);
-    --line: #36322a;
-    --mono: 'Space Mono', monospace;
-    --sans: 'Inter', sans-serif;
-  }
-
-  *{ box-sizing: border-box; }
-
-  html,body{
-    margin:0; padding:0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100vh;
-  }
-
-  /* ===== Header ===== */
-  header{
-    padding: 28px 32px 18px;
-    display:flex;
-    align-items:baseline;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--line);
-  }
-  header .brand{
-    font-family: var(--mono);
-    font-weight: 700;
-    font-size: 22px;
-    letter-spacing: 0.08em;
-    color: var(--text);
-  }
-  header .brand span{ color: var(--accent); }
-  header .tagline{
-    font-size: 12px;
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-  }
-
-  /* ===== Drop zone & staging ===== */
-  .control-panel{
-    padding: 22px 32px;
-    display:flex;
-    gap: 20px;
-    align-items: stretch;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .dropzone{
-    flex: 1 1 320px;
-    border: 1.5px dashed var(--line);
-    border-radius: 10px;
-    padding: 22px;
-    display:flex;
-    flex-direction: column;
-    align-items:center;
-    justify-content:center;
-    text-align:center;
-    gap: 6px;
-    transition: border-color .15s ease, background .15s ease;
-    cursor: default;
-  }
-  .dropzone.dragover{
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-  .dropzone .dz-title{
-    font-family: var(--mono);
-    font-size: 14px;
-    letter-spacing: 0.04em;
-  }
-  .dropzone .dz-sub{
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-
-  .staging{
-    flex: 1 1 320px;
-    display:flex;
-    flex-direction: column;
-    gap: 10px;
-    justify-content: space-between;
-  }
-  .staging-list{
-    display:flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-content: flex-start;
-    min-height: 38px;
-  }
-  .staging-empty{
-    font-size: 12px;
-    color: var(--text-muted);
-    align-self: center;
-  }
-  .chip{
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    padding: 6px 12px;
-    display:flex;
-    align-items:center;
-    gap: 8px;
-  }
-  .chip button{
-    background:none;
-    border:none;
-    color: var(--text-muted);
-    cursor:pointer;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0;
-  }
-  .chip button:hover{ color: var(--accent); }
-
-  .generate-btn{
-    align-self: flex-start;
-    font-family: var(--mono);
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    background: var(--accent);
-    color: #1a1505;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 22px;
-    cursor: pointer;
-    font-weight: 700;
-    transition: transform .08s ease, opacity .15s ease;
-  }
-  .generate-btn:disabled{
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-  .generate-btn:not(:disabled):hover{ transform: translateY(-1px); }
-
-  /* ===== Layout grid ===== */
-  main{
-    padding: 28px 32px 140px;
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-    gap: 22px;
-  }
-
-  .empty-state{
-    grid-column: 1 / -1;
-    text-align:center;
-    color: var(--text-muted);
-    font-size: 13px;
-    padding: 60px 0;
-    font-family: var(--mono);
-    letter-spacing: 0.04em;
-  }
-
-  .playlist-card{
-    background: var(--bg-card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    overflow: hidden;
-    display:flex;
-    flex-direction: column;
-  }
-  .playlist-head{
-    padding: 16px 18px 12px;
-    border-bottom: 1px solid var(--line);
-    display:flex;
-    justify-content: space-between;
-    align-items: baseline;
-  }
-  .playlist-head h2{
-    margin:0;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-  .playlist-head .count{
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .track-list{
-    list-style:none;
-    margin:0; padding: 6px;
-    display:flex;
-    flex-direction:column;
-  }
-  .track{
-    display:flex;
-    align-items:center;
-    gap: 12px;
-    width:100%;
-    text-align:left;
-    background:none;
-    border:none;
-    color: var(--text);
-    padding: 9px 10px;
-    border-radius: 7px;
-    cursor:pointer;
-    font-size: 13px;
-    font-family: var(--sans);
-    transition: background .1s ease;
-  }
-  .track:hover{ background: var(--bg-elevated); }
-  .track.playing{
-    background: var(--accent-dim);
-    color: var(--accent);
-  }
-  .track .num{
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    width: 26px;
-    flex-shrink:0;
-  }
-  .track.playing .num{ color: var(--accent); }
-  .track .name{
-    flex:1;
-    overflow:hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .track .icon{
-    font-size: 11px;
-    width: 16px;
-    text-align:center;
-    flex-shrink:0;
-    opacity: 0;
-  }
-  .track.playing .icon, .track:hover .icon{ opacity: 1; }
-
-  /* ===== Player bar ===== */
-  .player-bar{
-    position: fixed;
-    left:0; right:0; bottom:0;
-    background: var(--bg-elevated);
-    border-top: 1px solid var(--line);
-    padding: 12px 32px;
-    display:flex;
-    align-items:center;
-    gap: 22px;
-    flex-wrap: wrap;
-  }
-  .now-playing{
-    min-width: 180px;
-    max-width: 260px;
-    overflow:hidden;
-  }
-  .now-playing .track-name{
-    font-size: 13px;
-    font-weight: 600;
-    overflow:hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .now-playing .playlist-name{
-    font-size: 11px;
-    color: var(--text-muted);
-    font-family: var(--mono);
-    overflow:hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .transport{
-    display:flex;
-    align-items:center;
-    gap: 14px;
-  }
-  .transport button{
-    background: none;
-    border: 1px solid var(--line);
-    color: var(--text);
-    border-radius: 50%;
-    width: 38px; height: 38px;
-    cursor:pointer;
-    font-size: 14px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    transition: border-color .1s ease, color .1s ease;
-  }
-  .transport button:hover{ border-color: var(--accent); color: var(--accent); }
-  .transport button.play-pause{
-    width: 44px; height: 44px;
-    background: var(--accent);
-    color: #1a1505;
-    border: none;
-    font-size: 16px;
-  }
-  .transport button.play-pause:hover{ color:#1a1505; }
-  .transport button.loop-toggle.active{
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .progress-area{
-    flex: 1 1 240px;
-    display:flex;
-    align-items:center;
-    gap: 10px;
-    min-width: 180px;
-  }
-  .time{
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    width: 38px;
-    text-align:center;
-    flex-shrink:0;
-  }
-
-  /* segmented "tape" slider */
-  input[type="range"]{
-    flex:1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 6px;
-    border-radius: 3px;
-    background: repeating-linear-gradient(
-      to right,
-      var(--line) 0px, var(--line) 4px,
-      transparent 4px, transparent 6px
-    );
-    outline: none;
-    cursor:pointer;
-  }
-  input[type="range"]::-webkit-slider-runnable-track{
-    height:6px;
-    border-radius:3px;
-  }
-  input[type="range"]::-webkit-slider-thumb{
-    -webkit-appearance:none;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--bg-elevated);
-    margin-top: -3px;
-    cursor:pointer;
-  }
-  input[type="range"]::-moz-range-thumb{
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid var(--bg-elevated);
-    cursor:pointer;
-  }
-
-  /* ===== Naming modal ===== */
-  .modal-overlay{
-    position: fixed; inset:0;
-    background: rgba(0,0,0,0.55);
-    display:flex; align-items:center; justify-content:center;
-    z-index: 50;
-  }
-  .modal-overlay.hidden{ display:none; }
-  .modal{
-    background: var(--bg-elevated);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 22px;
-    width: 320px;
-  }
-  .modal h3{
-    margin: 0 0 4px;
-    font-size: 14px;
-    font-family: var(--mono);
-    letter-spacing: 0.04em;
-  }
-  .modal p{
-    margin: 0 0 14px;
-    font-size: 12px;
-    color: var(--text-muted);
-  }
-  .modal input[type="text"]{
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 10px 12px;
-    color: var(--text);
-    font-family: var(--sans);
-    font-size: 13px;
-    margin-bottom: 16px;
-  }
-  .modal input[type="text"]:focus{
-    outline: none;
-    border-color: var(--accent);
-  }
-  .modal-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap: 10px;
-  }
-  .modal-actions button{
-    font-family: var(--mono);
-    font-size: 12px;
-    border-radius: 7px;
-    padding: 9px 16px;
-    cursor:pointer;
-    border: 1px solid var(--line);
-    background: none;
-    color: var(--text);
-  }
-  .modal-actions button.primary{
-    background: var(--accent);
-    color: #1a1505;
-    border: none;
-    font-weight: 700;
-  }
-
-  @media (max-width: 640px){
-    header, .control-panel, main{ padding-left: 16px; padding-right: 16px; }
-    .player-bar{ padding: 10px 16px; }
-    .now-playing{ display:none; }
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+  .yz-root{--bg:#05020d;--bg2:#0c0618;--bg3:#130d22;--border:rgba(160,100,255,0.12);--border2:rgba(160,100,255,0.25);--text:#e8deff;--muted:#9a7fc4;--accent:#b06fff;--accent2:#9550f5;background:var(--bg);color:var(--text);font-family:'VT323',monospace;padding:16px;border-radius:4px;max-width:720px;margin:0 auto;}
+  .yz-label{font-family:'VT323',monospace;font-size:13px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:8px;}
+  .yz-h2{font-family:'Press Start 2P',monospace;font-size:16px;font-weight:400;color:var(--text);text-shadow:0 0 20px rgba(176,111,255,.3);margin:0 0 6px;line-height:1.4;}
+  .yz-sub{font-family:'VT323',monospace;font-size:17px;color:var(--muted);margin:0 0 18px;}
+  .yz-tracks{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;}
+  .yz-track{display:flex;align-items:center;gap:10px;background:var(--bg2);border:2px solid var(--border);border-radius:2px;padding:10px 12px;cursor:pointer;transition:background .15s,border-color .15s;}
+  .yz-track:hover{background:var(--bg3);border-color:var(--accent);}
+  .yz-track.playing{border-color:var(--accent);background:rgba(176,111,255,.1);}
+  .yz-track .num{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);min-width:22px;}
+  .yz-track.playing .num{color:var(--accent);}
+  .yz-track .icon{font-size:12px;color:var(--muted);width:16px;text-align:center;}
+  .yz-track.playing .icon{color:var(--accent);}
+  .yz-track .tname{font-family:'VT323',monospace;font-size:19px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .yz-track.playing .tname{color:var(--accent);text-shadow:0 0 8px var(--accent);}
+  .yz-bar{background:var(--bg2);border:2px solid var(--border2);border-radius:2px;padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:4px 4px 0 #6a00cc;}
+  .yz-np{min-width:140px;max-width:200px;}
+  .yz-np-sub{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);letter-spacing:.05em;text-shadow:0 0 6px var(--accent);margin-bottom:4px;}
+  .yz-np-name{font-family:'VT323',monospace;font-size:18px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;}
+  .yz-transport{display:flex;align-items:center;gap:8px;}
+  .yz-tbtn{background:rgba(176,111,255,.1);border:2px solid var(--border2);color:var(--text);border-radius:2px;width:34px;height:34px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color .1s,color .1s,transform .1s;}
+  .yz-tbtn:hover{border-color:var(--accent);color:var(--accent);}
+  .yz-tbtn:active{transform:scale(.93);}
+  .yz-tbtn.pp{width:40px;height:40px;background:var(--accent);color:#05020d;border:none;font-size:16px;box-shadow:3px 3px 0 #6a00cc;}
+  .yz-tbtn.pp:hover{background:var(--accent2);color:#05020d;}
+  .yz-tbtn.loop.on{border-color:var(--accent);color:var(--accent);}
+  .yz-prog{flex:1 1 180px;display:flex;align-items:center;gap:8px;min-width:140px;}
+  .yz-time{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--muted);min-width:32px;text-align:center;}
+  .yz-seek{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:1px;background:var(--bg3);border:1px solid var(--border);outline:none;cursor:pointer;}
+  .yz-seek::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:0;background:var(--accent);cursor:pointer;box-shadow:0 0 4px var(--accent);}
+  .yz-seek::-moz-range-thumb{width:12px;height:12px;border-radius:0;background:var(--accent);border:none;cursor:pointer;}
+  .yz-vol-row{display:flex;align-items:center;gap:6px;}
+  .yz-vol-lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);}
+  .yz-hint{font-family:'VT323',monospace;font-size:14px;color:var(--muted);margin-top:10px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;line-height:1.5;}
+  .yz-hint span{color:var(--accent);}
 </style>
-</head>
-<body>
 
-<header>
-  <div class="brand">CRA<span>TE</span></div>
-  <div class="tagline">drop folders → name them → build the layout</div>
-</header>
+<div class="yz-root">
+  <p class="yz-label">♪ Music Player</p>
+  <h2 class="yz-h2">Soundtrack</h2>
+  <p class="yz-sub">Click any track to play — add your own by editing the script.</p>
 
-<div class="control-panel">
-  <div class="dropzone" id="dropzone">
-    <div class="dz-title">Drop a folder of audio files here</div>
-    <div class="dz-sub">Each folder becomes one playlist</div>
-  </div>
+  <div class="yz-tracks" id="yzTracks"></div>
 
-  <div class="staging">
-    <div class="staging-list" id="stagingList">
-      <div class="staging-empty">Staged playlists will appear here</div>
+  <div class="yz-bar">
+    <div class="yz-np">
+      <div class="yz-np-sub">♪ NOW PLAYING</div>
+      <div class="yz-np-name" id="yzNpName">Nothing playing</div>
     </div>
-    <button class="generate-btn" id="generateBtn" disabled>Generate Layout</button>
-  </div>
-</div>
-
-<main id="main">
-  <div class="empty-state">No playlists yet — drop a folder above, then press Generate Layout.</div>
-</main>
-
-<div class="player-bar">
-  <div class="now-playing">
-    <div class="track-name" id="npTrack">Nothing playing</div>
-    <div class="playlist-name" id="npPlaylist">—</div>
-  </div>
-
-  <div class="transport">
-    <button id="prevBtn" title="Previous">⏮</button>
-    <button id="playPauseBtn" class="play-pause" title="Play / Pause">▶</button>
-    <button id="nextBtn" title="Next">⏭</button>
-    <button id="loopBtn" class="loop-toggle" title="Loop track">⟲</button>
-  </div>
-
-  <div class="progress-area">
-    <span class="time" id="curTime">0:00</span>
-    <input type="range" id="seek" min="0" max="100" value="0" step="0.1">
-    <span class="time" id="durTime">0:00</span>
-  </div>
-</div>
-
-<!-- Naming modal -->
-<div class="modal-overlay hidden" id="modalOverlay">
-  <div class="modal">
-    <h3>Name this playlist</h3>
-    <p id="modalSub">7 audio files detected</p>
-    <input type="text" id="modalInput" placeholder="Playlist 1">
-    <div class="modal-actions">
-      <button id="modalCancel">Cancel</button>
-      <button id="modalConfirm" class="primary">Add to staging</button>
+    <div class="yz-transport">
+      <button class="yz-tbtn" id="yzPrev">⏮</button>
+      <button class="yz-tbtn pp" id="yzPP">▶</button>
+      <button class="yz-tbtn" id="yzNext">⏭</button>
+      <button class="yz-tbtn loop" id="yzLoop">⟲</button>
+    </div>
+    <div class="yz-prog">
+      <span class="yz-time" id="yzCur">0:00</span>
+      <input type="range" class="yz-seek" id="yzSeek" min="0" max="100" value="0" step="0.1" />
+      <span class="yz-time" id="yzDur">0:00</span>
+    </div>
+    <div class="yz-vol-row">
+      <span class="yz-vol-lbl">VOL</span>
+      <input type="range" class="yz-seek" id="yzVol" min="0" max="1" step="0.01" value="0.7" style="width:70px;" />
     </div>
   </div>
+
+  <div class="yz-hint">
+    To add songs: edit the <span>TRACKS</span> array in the script — paste in the raw GitHub URL and give it a name.
+  </div>
 </div>
 
-<audio id="audio"></audio>
+<audio id="yzAudio"></audio>
 
 <script>
-  const AUDIO_EXT = ['mp3','wav','ogg','m4a','flac','aac','webm'];
+// ============================================================
+//  ADD YOUR TRACKS HERE — just paste the raw URL and a name
+// ============================================================
+var TRACKS = [
+  {
+    name: "Liminal Spaces — Dark Ambient Mix 4",
+    url:  "https://raw.githubusercontent.com/redvr777/Yuza/67930de687f2729d2ed1f2cc7168189f8660b57a/liminal%20spaces%20__%20dark%20ambient%20music%20mix%204%20(1).mp3"
+  },
+  // Add more tracks like this:
+  // { name: "Track Name Here", url: "https://raw.githubusercontent.com/..." },
+  // { name: "Another Track",   url: "https://raw.githubusercontent.com/..." },
+];
+// ============================================================
 
-  let stagedPlaylists = [];   // [{name, tracks:[{name, file}]}]
-  let renderedPlaylists = []; // [{id, name, tracks:[{name, file}]}]
-  let playlistCounter = 1;
+(function(){
+  var cur = -1;
+  var seeking = false;
+  var audio = document.getElementById('yzAudio');
+  var trackList = document.getElementById('yzTracks');
+  var npName = document.getElementById('yzNpName');
+  var pp = document.getElementById('yzPP');
+  var prev = document.getElementById('yzPrev');
+  var next = document.getElementById('yzNext');
+  var loop = document.getElementById('yzLoop');
+  var seek = document.getElementById('yzSeek');
+  var curT = document.getElementById('yzCur');
+  var durT = document.getElementById('yzDur');
+  var vol = document.getElementById('yzVol');
+  audio.volume = 0.7;
 
-  let currentPlaylistId = null;
-  let currentTrackIndex = -1;
-  let pendingEntryFolder = null; // folder/files awaiting naming
-
-  const dropzone = document.getElementById('dropzone');
-  const stagingList = document.getElementById('stagingList');
-  const generateBtn = document.getElementById('generateBtn');
-  const main = document.getElementById('main');
-  const audio = document.getElementById('audio');
-
-  const modalOverlay = document.getElementById('modalOverlay');
-  const modalInput = document.getElementById('modalInput');
-  const modalSub = document.getElementById('modalSub');
-  const modalConfirm = document.getElementById('modalConfirm');
-  const modalCancel = document.getElementById('modalCancel');
-
-  const npTrack = document.getElementById('npTrack');
-  const npPlaylist = document.getElementById('npPlaylist');
-  const playPauseBtn = document.getElementById('playPauseBtn');
-  const prevBtn = document.getElementById('prevBtn');
-  const nextBtn = document.getElementById('nextBtn');
-  const loopBtn = document.getElementById('loopBtn');
-  const seek = document.getElementById('seek');
-  const curTime = document.getElementById('curTime');
-  const durTime = document.getElementById('durTime');
-
-  /* ---------- Drag & drop handling ---------- */
-
-  dropzone.addEventListener('dragover', e => {
-    e.preventDefault();
-    dropzone.classList.add('dragover');
-  });
-  dropzone.addEventListener('dragleave', () => {
-    dropzone.classList.remove('dragover');
-  });
-  dropzone.addEventListener('drop', async e => {
-    e.preventDefault();
-    dropzone.classList.remove('dragover');
-
-    const items = e.dataTransfer.items;
-    if(!items || items.length === 0) return;
-
-    const files = [];
-    let folderName = null;
-
-    for(const item of items){
-      const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
-      if(entry){
-        if(entry.isDirectory && folderName === null) folderName = entry.name;
-        await collectFiles(entry, files);
-      } else {
-        // fallback: plain files dropped without folder structure
-        const f = item.getAsFile && item.getAsFile();
-        if(f && isAudioFile(f.name)) files.push(f);
-      }
-    }
-
-    const audioFiles = files.filter(f => isAudioFile(f.name));
-    if(audioFiles.length === 0){
-      alert('No audio files found in that drop.');
-      return;
-    }
-
-    pendingEntryFolder = { folderName, files: audioFiles };
-    openNamingModal(audioFiles.length, folderName);
-  });
-
-  function isAudioFile(name){
-    const ext = name.split('.').pop().toLowerCase();
-    return AUDIO_EXT.includes(ext);
+  function fmt(s){
+    if(!s||isNaN(s))return'0:00';
+    var m=Math.floor(s/60),sec=Math.floor(s%60);
+    return m+':'+(sec<10?'0':'')+sec;
   }
 
-  function collectFiles(entry, out){
-    return new Promise(resolve => {
-      if(entry.isFile){
-        entry.file(file => { out.push(file); resolve(); }, () => resolve());
-      } else if(entry.isDirectory){
-        const reader = entry.createReader();
-        const readBatch = () => {
-          reader.readEntries(async entries => {
-            if(entries.length === 0){ resolve(); return; }
-            await Promise.all(entries.map(e => collectFiles(e, out)));
-            readBatch();
-          }, () => resolve());
-        };
-        readBatch();
-      } else {
-        resolve();
-      }
+  function render(){
+    trackList.innerHTML='';
+    TRACKS.forEach(function(t,i){
+      var div=document.createElement('div');
+      div.className='yz-track'+(i===cur?' playing':'');
+      div.innerHTML=
+        '<span class="num">'+(i+1<10?'0'+(i+1):i+1)+'</span>'+
+        '<span class="icon">'+(i===cur&&!audio.paused?'⏸':'▶')+'</span>'+
+        '<span class="tname">'+t.name+'</span>';
+      div.addEventListener('click',function(){ playTrack(i); });
+      trackList.appendChild(div);
     });
   }
 
-  /* ---------- Naming modal ---------- */
-
-  function openNamingModal(count, folderName){
-    modalSub.textContent = `${count} audio source${count === 1 ? '' : 's'} detected`;
-    modalInput.value = folderName || `Playlist ${playlistCounter}`;
-    modalOverlay.classList.remove('hidden');
-    modalInput.focus();
-    modalInput.select();
+  function playTrack(i){
+    if(i<0||i>=TRACKS.length)return;
+    cur=i;
+    audio.src=TRACKS[i].url;
+    audio.play().catch(function(){});
+    npName.textContent=TRACKS[i].name;
+    pp.textContent='⏸';
+    render();
   }
 
-  function closeNamingModal(){
-    modalOverlay.classList.add('hidden');
-    pendingEntryFolder = null;
-  }
-
-  modalCancel.addEventListener('click', closeNamingModal);
-
-  modalInput.addEventListener('keydown', e => {
-    if(e.key === 'Enter') modalConfirm.click();
-    if(e.key === 'Escape') closeNamingModal();
+  pp.addEventListener('click',function(){
+    if(cur<0&&TRACKS.length)return playTrack(0);
+    if(audio.paused){audio.play().catch(function(){});pp.textContent='⏸';}
+    else{audio.pause();pp.textContent='▶';}
+    render();
   });
-
-  modalConfirm.addEventListener('click', () => {
-    if(!pendingEntryFolder) return;
-    let name = modalInput.value.trim();
-    if(!name) name = `Playlist ${playlistCounter}`;
-
-    const tracks = pendingEntryFolder.files.map(f => ({
-      name: stripExtension(f.name),
-      file: f
-    }));
-
-    stagedPlaylists.push({ name, tracks });
-    playlistCounter++;
-    renderStaging();
-    closeNamingModal();
+  prev.addEventListener('click',function(){
+    if(!TRACKS.length)return;
+    playTrack(cur<=0?TRACKS.length-1:cur-1);
   });
-
-  function stripExtension(name){
-    const idx = name.lastIndexOf('.');
-    return idx > 0 ? name.substring(0, idx) : name;
-  }
-
-  /* ---------- Staging area ---------- */
-
-  function renderStaging(){
-    stagingList.innerHTML = '';
-    if(stagedPlaylists.length === 0){
-      stagingList.innerHTML = '<div class="staging-empty">Staged playlists will appear here</div>';
-    } else {
-      stagedPlaylists.forEach((pl, idx) => {
-        const chip = document.createElement('div');
-        chip.className = 'chip';
-        chip.innerHTML = `${escapeHtml(pl.name)} · ${pl.tracks.length} tracks
-          <button data-idx="${idx}" title="Remove">×</button>`;
-        chip.querySelector('button').addEventListener('click', () => {
-          stagedPlaylists.splice(idx, 1);
-          renderStaging();
-        });
-        stagingList.appendChild(chip);
-      });
-    }
-    generateBtn.disabled = stagedPlaylists.length === 0;
-  }
-
-  /* ---------- Generate layout ---------- */
-
-  generateBtn.addEventListener('click', () => {
-    if(stagedPlaylists.length === 0) return;
-
-    stagedPlaylists.forEach(pl => {
-      renderedPlaylists.push({
-        id: `pl-${renderedPlaylists.length}-${Date.now()}`,
-        name: pl.name,
-        tracks: pl.tracks
-      });
-    });
-    stagedPlaylists = [];
-    renderStaging();
-    renderMain();
+  next.addEventListener('click',function(){
+    if(!TRACKS.length)return;
+    playTrack(cur>=TRACKS.length-1?0:cur+1);
   });
-
-  function renderMain(){
-    main.innerHTML = '';
-    if(renderedPlaylists.length === 0){
-      main.innerHTML = '<div class="empty-state">No playlists yet — drop a folder above, then press Generate Layout.</div>';
-      return;
-    }
-
-    renderedPlaylists.forEach(pl => {
-      const card = document.createElement('div');
-      card.className = 'playlist-card';
-
-      const head = document.createElement('div');
-      head.className = 'playlist-head';
-      head.innerHTML = `<h2>${escapeHtml(pl.name)}</h2><span class="count">${pl.tracks.length} tracks</span>`;
-      card.appendChild(head);
-
-      const list = document.createElement('ul');
-      list.className = 'track-list';
-
-      pl.tracks.forEach((track, idx) => {
-        const li = document.createElement('li');
-        const btn = document.createElement('button');
-        btn.className = 'track';
-        btn.dataset.playlistId = pl.id;
-        btn.dataset.trackIndex = idx;
-        btn.innerHTML = `<span class="num">${String(idx+1).padStart(2,'0')}</span>
-                          <span class="name">${escapeHtml(track.name)}</span>
-                          <span class="icon">▶</span>`;
-        btn.addEventListener('click', () => playTrack(pl.id, idx));
-        li.appendChild(btn);
-        list.appendChild(li);
-      });
-
-      card.appendChild(list);
-      main.appendChild(card);
-    });
-
-    highlightCurrentTrack();
-  }
-
-  function escapeHtml(str){
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  /* ---------- Player ---------- */
-
-  function getPlaylist(id){
-    return renderedPlaylists.find(p => p.id === id);
-  }
-
-  function playTrack(playlistId, index){
-    const pl = getPlaylist(playlistId);
-    if(!pl || !pl.tracks[index]) return;
-
-    currentPlaylistId = playlistId;
-    currentTrackIndex = index;
-
-    const track = pl.tracks[index];
-    const url = URL.createObjectURL(track.file);
-    audio.src = url;
-    audio.play();
-
-    npTrack.textContent = track.name;
-    npPlaylist.textContent = pl.name;
-    playPauseBtn.textContent = '⏸';
-
-    highlightCurrentTrack();
-  }
-
-  function highlightCurrentTrack(){
-    document.querySelectorAll('.track').forEach(btn => {
-      const isCurrent = btn.dataset.playlistId === currentPlaylistId &&
-                         Number(btn.dataset.trackIndex) === currentTrackIndex;
-      btn.classList.toggle('playing', isCurrent);
-      btn.querySelector('.icon').textContent = isCurrent && !audio.paused ? '⏸' : '▶';
-    });
-  }
-
-  playPauseBtn.addEventListener('click', () => {
-    if(currentPlaylistId === null) return;
-    if(audio.paused){
-      audio.play();
-      playPauseBtn.textContent = '⏸';
-    } else {
-      audio.pause();
-      playPauseBtn.textContent = '▶';
-    }
-    highlightCurrentTrack();
+  loop.addEventListener('click',function(){
+    audio.loop=!audio.loop;
+    loop.classList.toggle('on',audio.loop);
   });
+  audio.addEventListener('ended',function(){if(!audio.loop)next.click();});
+  audio.addEventListener('play',function(){pp.textContent='⏸';render();});
+  audio.addEventListener('pause',function(){pp.textContent='▶';render();});
+  audio.addEventListener('loadedmetadata',function(){seek.max=audio.duration||0;durT.textContent=fmt(audio.duration);});
+  audio.addEventListener('timeupdate',function(){if(!seeking){seek.value=audio.currentTime;curT.textContent=fmt(audio.currentTime);}});
+  seek.addEventListener('mousedown',function(){seeking=true;});
+  seek.addEventListener('input',function(){curT.textContent=fmt(Number(seek.value));});
+  seek.addEventListener('change',function(){audio.currentTime=Number(seek.value);seeking=false;});
+  vol.addEventListener('input',function(){audio.volume=Number(vol.value);});
 
-  prevBtn.addEventListener('click', () => {
-    if(currentPlaylistId === null) return;
-    const pl = getPlaylist(currentPlaylistId);
-    let idx = currentTrackIndex - 1;
-    if(idx < 0) idx = pl.tracks.length - 1;
-    playTrack(currentPlaylistId, idx);
-  });
-
-  nextBtn.addEventListener('click', () => {
-    if(currentPlaylistId === null) return;
-    const pl = getPlaylist(currentPlaylistId);
-    let idx = currentTrackIndex + 1;
-    if(idx >= pl.tracks.length) idx = 0;
-    playTrack(currentPlaylistId, idx);
-  });
-
-  loopBtn.addEventListener('click', () => {
-    audio.loop = !audio.loop;
-    loopBtn.classList.toggle('active', audio.loop);
-  });
-
-  audio.addEventListener('ended', () => {
-    if(audio.loop) return; // native loop handles replay
-    nextBtn.click();
-  });
-
-  audio.addEventListener('play', () => {
-    playPauseBtn.textContent = '⏸';
-    highlightCurrentTrack();
-  });
-  audio.addEventListener('pause', () => {
-    playPauseBtn.textContent = '▶';
-    highlightCurrentTrack();
-  });
-
-  /* progress / seek */
-  audio.addEventListener('loadedmetadata', () => {
-    seek.max = audio.duration || 0;
-    durTime.textContent = formatTime(audio.duration);
-  });
-
-  audio.addEventListener('timeupdate', () => {
-    if(!isSeeking){
-      seek.value = audio.currentTime;
-      curTime.textContent = formatTime(audio.currentTime);
-    }
-  });
-
-  let isSeeking = false;
-  seek.addEventListener('input', () => {
-    isSeeking = true;
-    curTime.textContent = formatTime(Number(seek.value));
-  });
-  seek.addEventListener('change', () => {
-    audio.currentTime = Number(seek.value);
-    isSeeking = false;
-  });
-
-  function formatTime(sec){
-    if(!sec || isNaN(sec)) return '0:00';
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s.toString().padStart(2,'0')}`;
-  }
+  render();
+})();
 </script>
-
-</body>
-</html>
