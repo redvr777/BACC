@@ -7,88 +7,280 @@
   --border:rgba(160,100,255,0.15);--border2:rgba(160,100,255,0.3);
   --text:#e8deff;--muted:#9a7fc4;
   --accent:#b06fff;--accent2:#9550f5;
-  --aglow:rgba(176,111,255,0.15);
+  --aglow:rgba(176,111,255,0.12);
 }
-body,html{background:transparent;}
-.wrap{background:var(--bg);color:var(--text);font-family:'VT323',monospace;width:100%;min-height:100vh;display:flex;flex-direction:column;}
+.wrap{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'VT323',monospace;
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+}
 
-/* header */
-.hdr{padding:18px 20px 12px;border-bottom:2px solid var(--border2);}
-.hdr-label{font-family:'VT323',monospace;font-size:13px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:6px;}
-.hdr-title{font-family:'Press Start 2P',monospace;font-size:clamp(12px,3vw,18px);font-weight:400;color:var(--text);text-shadow:0 0 18px rgba(176,111,255,.35);line-height:1.5;margin-bottom:4px;}
-.hdr-sub{font-family:'VT323',monospace;font-size:clamp(15px,3vw,18px);color:var(--muted);}
+/* HEADER */
+.hdr{
+  padding:20px 24px 14px;
+  border-bottom:2px solid var(--border2);
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.hdr-left .label{font-family:'VT323',monospace;font-size:16px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;}
+.hdr-left .title{font-family:'Press Start 2P',monospace;font-size:20px;font-weight:400;color:var(--text);text-shadow:0 0 18px rgba(176,111,255,.35);line-height:1.4;}
+.hdr-right{font-family:'VT323',monospace;font-size:18px;color:var(--muted);}
+.hdr-right span{color:var(--accent);}
 
-/* status */
-.status{padding:10px 20px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--accent);letter-spacing:.05em;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
-.status .dot{width:7px;height:7px;background:var(--accent);flex-shrink:0;animation:blink 1.2s step-end infinite;}
+/* STATUS */
+.status{
+  padding:10px 24px;
+  font-family:'Press Start 2P',monospace;
+  font-size:10px;
+  color:var(--accent);
+  letter-spacing:.05em;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  border-bottom:1px solid var(--border);
+}
+.dot{width:8px;height:8px;background:var(--accent);flex-shrink:0;animation:blink 1.2s step-end infinite;}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
-.status.err .dot{background:#ff4444;animation:none;}
-.status.err{color:#ff4444;}
 .status.ok .dot{background:#44ff88;animation:none;}
 .status.ok{color:#44ff88;}
+.status.err .dot{background:#ff4444;animation:none;}
+.status.err{color:#ff4444;}
 
-/* track list */
-.tlist{flex:1;overflow-y:auto;padding:8px 12px;}
+/* TRACK LIST */
+.tlist{
+  flex:1;
+  overflow-y:auto;
+  padding:12px 16px;
+}
 .tlist::-webkit-scrollbar{width:4px;}
 .tlist::-webkit-scrollbar-track{background:var(--bg2);}
-.tlist::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
-.track{display:flex;align-items:center;gap:10px;padding:10px 12px;border:2px solid var(--border);border-radius:2px;margin-bottom:6px;cursor:pointer;transition:background .12s,border-color .12s;background:var(--bg2);}
+.tlist::-webkit-scrollbar-thumb{background:var(--border2);}
+
+.track{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:14px 16px;
+  border:2px solid var(--border);
+  margin-bottom:8px;
+  cursor:pointer;
+  background:var(--bg2);
+  transition:background .12s, border-color .12s;
+  border-radius:2px;
+}
 .track:hover{background:var(--bg3);border-color:var(--accent);}
 .track.playing{border-color:var(--accent);background:var(--aglow);}
-.track .num{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--muted);min-width:20px;flex-shrink:0;}
-.track.playing .num{color:var(--accent);}
-.track .ico{font-size:11px;color:var(--muted);width:14px;flex-shrink:0;text-align:center;}
-.track.playing .ico{color:var(--accent);}
-.track .tname{font-family:'VT323',monospace;font-size:clamp(16px,3vw,20px);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.track.playing .tname{color:var(--accent);text-shadow:0 0 8px var(--accent);}
-.track .ext{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);background:var(--bg3);border:1px solid var(--border);padding:2px 5px;border-radius:1px;flex-shrink:0;}
-.empty{text-align:center;padding:40px 20px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);letter-spacing:.05em;line-height:1.8;}
 
-/* player bar */
-.bar{background:var(--bg2);border-top:2px solid var(--border2);padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;box-shadow:0 -4px 0 #6a00cc;}
-.np{flex:1 1 140px;min-width:0;overflow:hidden;}
-.np-label{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--accent);text-shadow:0 0 6px var(--accent);margin-bottom:3px;letter-spacing:.05em;}
-.np-name{font-family:'VT323',monospace;font-size:clamp(15px,3vw,19px);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.transport{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.tbtn{background:var(--aglow);border:2px solid var(--border2);color:var(--text);border-radius:2px;width:32px;height:32px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color .1s,color .1s,transform .1s;flex-shrink:0;}
+.track .num{
+  font-family:'Press Start 2P',monospace;
+  font-size:11px;
+  color:var(--muted);
+  min-width:26px;
+  flex-shrink:0;
+}
+.track.playing .num{color:var(--accent);}
+
+.track .ico{
+  font-size:14px;
+  color:var(--muted);
+  width:18px;
+  text-align:center;
+  flex-shrink:0;
+}
+.track.playing .ico{color:var(--accent);}
+
+.track .tname{
+  font-family:'VT323',monospace;
+  font-size:22px;
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  line-height:1.2;
+}
+.track.playing .tname{color:var(--accent);text-shadow:0 0 8px var(--accent);}
+
+.track .ext{
+  font-family:'Press Start 2P',monospace;
+  font-size:8px;
+  color:var(--muted);
+  background:var(--bg3);
+  border:1px solid var(--border);
+  padding:3px 7px;
+  flex-shrink:0;
+}
+
+.empty{
+  text-align:center;
+  padding:60px 20px;
+  font-family:'Press Start 2P',monospace;
+  font-size:11px;
+  color:var(--muted);
+  letter-spacing:.05em;
+  line-height:2;
+}
+
+/* PLAYER BAR */
+.bar{
+  background:var(--bg2);
+  border-top:2px solid var(--border2);
+  box-shadow:0 -4px 0 #6a00cc;
+  padding:14px 20px;
+  display:flex;
+  align-items:center;
+  gap:16px;
+  flex-wrap:wrap;
+}
+
+.np{
+  flex:0 0 auto;
+  min-width:160px;
+  max-width:240px;
+  overflow:hidden;
+}
+.np-label{
+  font-family:'Press Start 2P',monospace;
+  font-size:8px;
+  color:var(--accent);
+  text-shadow:0 0 6px var(--accent);
+  letter-spacing:.05em;
+  margin-bottom:5px;
+}
+.np-name{
+  font-family:'VT323',monospace;
+  font-size:20px;
+  color:var(--text);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  line-height:1.2;
+}
+
+.transport{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+.tbtn{
+  background:var(--aglow);
+  border:2px solid var(--border2);
+  color:var(--text);
+  border-radius:2px;
+  width:40px;height:40px;
+  cursor:pointer;
+  font-size:16px;
+  display:flex;align-items:center;justify-content:center;
+  padding:0;
+  transition:border-color .1s,color .1s,transform .1s;
+  flex-shrink:0;
+}
 .tbtn:hover{border-color:var(--accent);color:var(--accent);}
 .tbtn:active{transform:scale(.92);}
-.tbtn.pp{width:38px;height:38px;background:var(--accent);color:#05020d;border:none;font-size:15px;box-shadow:3px 3px 0 #6a00cc;}
+.tbtn.pp{
+  width:48px;height:48px;
+  background:var(--accent);
+  color:#05020d;
+  border:none;
+  font-size:18px;
+  box-shadow:3px 3px 0 #6a00cc;
+}
 .tbtn.pp:hover{background:var(--accent2);color:#05020d;}
 .tbtn.loop.on{border-color:var(--accent);color:var(--accent);}
-.prog{flex:1 1 160px;display:flex;align-items:center;gap:6px;min-width:120px;}
-.time{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);min-width:28px;text-align:center;flex-shrink:0;}
-input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:1px;background:var(--bg3);border:1px solid var(--border);outline:none;cursor:pointer;}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:0;background:var(--accent);cursor:pointer;box-shadow:0 0 4px var(--accent);}
-input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:0;background:var(--accent);border:none;cursor:pointer;}
-.vol-row{display:flex;align-items:center;gap:5px;flex-shrink:0;}
-.vol-lbl{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);}
-.vol-row input{width:60px;}
 
-@media(max-width:480px){
-  .hdr{padding:12px 14px 10px;}
-  .bar{padding:8px 10px;gap:7px;}
-  .tlist{padding:6px 8px;}
-  .track{padding:8px 10px;}
+.prog{
+  flex:1 1 200px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:160px;
+}
+.time{
+  font-family:'Press Start 2P',monospace;
+  font-size:9px;
+  color:var(--muted);
+  min-width:36px;
+  text-align:center;
+  flex-shrink:0;
+}
+input[type=range]{
+  flex:1;
+  -webkit-appearance:none;
+  appearance:none;
+  height:5px;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  outline:none;
+  cursor:pointer;
+  border-radius:1px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:14px;height:14px;
+  border-radius:0;
+  background:var(--accent);
+  cursor:pointer;
+  box-shadow:0 0 5px var(--accent);
+}
+input[type=range]::-moz-range-thumb{
+  width:14px;height:14px;
+  border-radius:0;
+  background:var(--accent);
+  border:none;cursor:pointer;
+}
+
+.vol-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-shrink:0;
+}
+.vol-lbl{
+  font-family:'Press Start 2P',monospace;
+  font-size:8px;
+  color:var(--muted);
+}
+.vol-row input{width:80px;}
+
+/* responsive */
+@media(max-width:560px){
+  .hdr{padding:14px 16px 10px;}
+  .hdr-left .title{font-size:15px;}
+  .bar{padding:12px 14px;gap:10px;}
+  .np{max-width:160px;}
+  .np-name{font-size:17px;}
+  .tbtn{width:36px;height:36px;font-size:14px;}
+  .tbtn.pp{width:42px;height:42px;font-size:16px;}
   .vol-row{display:none;}
-  .np{flex:1 1 100px;}
+  .track{padding:12px 12px;gap:10px;}
+  .track .tname{font-size:19px;}
+  .tlist{padding:10px 10px;}
 }
 </style>
 
 <div class="wrap">
   <div class="hdr">
-    <div class="hdr-label">♪ Music Player</div>
-    <div class="hdr-title">Soundtrack</div>
-    <div class="hdr-sub">Auto-loaded from <span style="color:var(--accent)">redvr777/BACC</span></div>
+    <div class="hdr-left">
+      <div class="label">♪ Music</div>
+      <div class="title">Soundtrack</div>
+    </div>
+    <div class="hdr-right">auto-loaded from <span>redvr777/BACC</span></div>
   </div>
 
   <div class="status" id="status">
     <div class="dot"></div>
-    <span id="statusText">Scanning repo for audio files…</span>
+    <span id="statusTx">Scanning repo for audio files…</span>
   </div>
 
   <div class="tlist" id="tlist">
-    <div class="empty" id="emptyMsg">Loading…</div>
+    <div class="empty">Loading…</div>
   </div>
 
   <div class="bar">
@@ -117,67 +309,38 @@ input[type=range]::-moz-range-thumb{width:11px;height:11px;border-radius:0;backg
 <audio id="aud"></audio>
 
 <script>
-// ── CONFIG ──────────────────────────────────────────────
-var REPO  = 'redvr777/BACC';
-var BRANCH = 'main'; // change to 'master' if needed
-var AUDIO_EXT = ['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
-// ────────────────────────────────────────────────────────
+var REPO   = 'redvr777/BACC';
+var BRANCH = 'main';
+var EXTS   = ['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
 
-var tracks = [];
-var cur = -1;
-var seeking = false;
+var tracks=[], cur=-1, seeking=false;
+var aud=document.getElementById('aud');
+var tlist=document.getElementById('tlist');
+var npName=document.getElementById('npName');
+var btnPP=document.getElementById('btnPP');
+var btnPrev=document.getElementById('btnPrev');
+var btnNext=document.getElementById('btnNext');
+var btnLoop=document.getElementById('btnLoop');
+var seek=document.getElementById('seek');
+var tCur=document.getElementById('tCur');
+var tDur=document.getElementById('tDur');
+var vol=document.getElementById('vol');
+var statusEl=document.getElementById('status');
+var statusTx=document.getElementById('statusTx');
 
-var aud      = document.getElementById('aud');
-var tlist    = document.getElementById('tlist');
-var emptyMsg = document.getElementById('emptyMsg');
-var npName   = document.getElementById('npName');
-var btnPP    = document.getElementById('btnPP');
-var btnPrev  = document.getElementById('btnPrev');
-var btnNext  = document.getElementById('btnNext');
-var btnLoop  = document.getElementById('btnLoop');
-var seek     = document.getElementById('seek');
-var tCur     = document.getElementById('tCur');
-var tDur     = document.getElementById('tDur');
-var vol      = document.getElementById('vol');
-var statusEl = document.getElementById('status');
-var statusTx = document.getElementById('statusText');
+aud.volume=0.7;
 
-aud.volume = 0.7;
-
-function setStatus(type, msg){
-  statusEl.className = 'status ' + type;
-  statusTx.textContent = msg;
-}
-
-function fmt(s){
-  if(!s||isNaN(s))return'0:00';
-  var m=Math.floor(s/60),sec=Math.floor(s%60);
-  return m+':'+(sec<10?'0':'')+sec;
-}
-
-function extOf(path){
-  return (path.split('.').pop()||'').toLowerCase();
-}
-
-function cleanName(path){
-  var n = path.split('/').pop();
-  n = n.replace(/\.[^.]+$/,'');
-  n = decodeURIComponent(n).replace(/[_+]/g,' ');
-  return n;
-}
-
-function rawUrl(path){
-  return 'https://raw.githubusercontent.com/'+REPO+'/'+BRANCH+'/'+path;
-}
+function setStatus(t,m){statusEl.className='status '+t;statusTx.textContent=m;}
+function fmt(s){if(!s||isNaN(s))return'0:00';var m=Math.floor(s/60),sec=Math.floor(s%60);return m+':'+(sec<10?'0':'')+sec;}
+function extOf(p){return(p.split('.').pop()||'').toLowerCase();}
+function cleanName(p){var n=p.split('/').pop().replace(/\.[^.]+$/,'');return decodeURIComponent(n).replace(/[_+]/g,' ');}
+function rawUrl(p){return'https://raw.githubusercontent.com/'+REPO+'/'+BRANCH+'/'+encodeURI(p);}
 
 function render(){
   tlist.innerHTML='';
   if(!tracks.length){
-    var d=document.createElement('div');
-    d.className='empty';
-    d.textContent='No audio files found in this repo.';
-    tlist.appendChild(d);
-    return;
+    var d=document.createElement('div');d.className='empty';
+    d.textContent='No audio files found in this repo.';tlist.appendChild(d);return;
   }
   tracks.forEach(function(t,i){
     var div=document.createElement('div');
@@ -187,86 +350,52 @@ function render(){
       '<span class="ico">'+(i===cur&&!aud.paused?'⏸':'▶')+'</span>'+
       '<span class="tname">'+t.name+'</span>'+
       '<span class="ext">'+t.ext+'</span>';
-    div.addEventListener('click',function(){ playTrack(i); });
+    div.addEventListener('click',function(){playTrack(i);});
     tlist.appendChild(div);
   });
 }
 
 function playTrack(i){
   if(i<0||i>=tracks.length)return;
-  cur=i;
-  aud.src=tracks[i].url;
+  cur=i;aud.src=tracks[i].url;
   aud.play().catch(function(){});
   npName.textContent=tracks[i].name;
-  btnPP.textContent='⏸';
-  render();
-  // scroll track into view
+  btnPP.textContent='⏸';render();
   var el=tlist.querySelectorAll('.track')[i];
   if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 
-// ── GitHub API fetch ─────────────────────────────────────
 function loadTracks(){
-  var apiUrl='https://api.github.com/repos/'+REPO+'/git/trees/'+BRANCH+'?recursive=1';
-  fetch(apiUrl)
-    .then(function(r){
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      return r.json();
-    })
+  fetch('https://api.github.com/repos/'+REPO+'/git/trees/'+BRANCH+'?recursive=1')
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
     .then(function(data){
-      if(!data.tree){throw new Error('No tree in response');}
-      var found=[];
+      if(!data.tree)throw new Error('No tree');
+      tracks=[];
       data.tree.forEach(function(item){
         if(item.type!=='blob')return;
         var ext=extOf(item.path);
-        if(AUDIO_EXT.indexOf(ext)===-1)return;
-        found.push({
-          name: cleanName(item.path),
-          url:  rawUrl(item.path),
-          ext:  ext
-        });
+        if(EXTS.indexOf(ext)===-1)return;
+        tracks.push({name:cleanName(item.path),url:rawUrl(item.path),ext:ext});
       });
-      tracks=found;
-      if(!tracks.length){
-        setStatus('err','No audio files found in redvr777/BACC');
-      } else {
-        setStatus('ok', tracks.length+' track'+(tracks.length===1?'':'s')+' loaded from BACC');
-      }
+      if(!tracks.length){setStatus('err','No audio files found in '+REPO);}
+      else{setStatus('ok',tracks.length+' track'+(tracks.length===1?'':'s')+' loaded');}
       render();
     })
     .catch(function(e){
-      // try master branch if main fails
-      if(BRANCH==='main'){
-        BRANCH='master';
-        setStatus('','Retrying on master branch…');
-        loadTracks();
-        return;
-      }
-      setStatus('err','Could not load repo: '+e.message);
-      emptyMsg.textContent='Failed to load. Check that redvr777/BACC is public.';
-      render();
+      if(BRANCH==='main'){BRANCH='master';setStatus('','Retrying on master branch…');loadTracks();return;}
+      setStatus('err','Could not load: '+e.message);render();
     });
 }
 
-// ── Transport ────────────────────────────────────────────
 btnPP.addEventListener('click',function(){
   if(cur<0&&tracks.length)return playTrack(0);
   if(aud.paused){aud.play().catch(function(){});btnPP.textContent='⏸';}
   else{aud.pause();btnPP.textContent='▶';}
   render();
 });
-btnPrev.addEventListener('click',function(){
-  if(!tracks.length)return;
-  playTrack(cur<=0?tracks.length-1:cur-1);
-});
-btnNext.addEventListener('click',function(){
-  if(!tracks.length)return;
-  playTrack(cur>=tracks.length-1?0:cur+1);
-});
-btnLoop.addEventListener('click',function(){
-  aud.loop=!aud.loop;
-  btnLoop.classList.toggle('on',aud.loop);
-});
+btnPrev.addEventListener('click',function(){if(tracks.length)playTrack(cur<=0?tracks.length-1:cur-1);});
+btnNext.addEventListener('click',function(){if(tracks.length)playTrack(cur>=tracks.length-1?0:cur+1);});
+btnLoop.addEventListener('click',function(){aud.loop=!aud.loop;btnLoop.classList.toggle('on',aud.loop);});
 aud.addEventListener('ended',function(){if(!aud.loop)btnNext.click();});
 aud.addEventListener('play',function(){btnPP.textContent='⏸';render();});
 aud.addEventListener('pause',function(){btnPP.textContent='▶';render();});
