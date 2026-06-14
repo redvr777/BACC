@@ -397,10 +397,14 @@ viewTabs.querySelectorAll('.view-tab').forEach(function(t){
 
 // ── FLAT LIST ──
 function rebuildAllTracks(){
+  // Build a url->duration map from existing allTracks so probed durations survive rebuilds
+  var durCache={};
+  allTracks.forEach(function(t){ if(t.duration!=null) durCache[t.url]=t.duration; });
   allTracks=[];
   plData.forEach(function(pl,pi){
     pl.tracks.forEach(function(t){
-      allTracks.push({ name:t.name, url:t.url, ext:t.ext, plIdx:pi, duration:t.duration!=null?t.duration:null });
+      var dur = t.duration!=null ? t.duration : (durCache[t.url]!=null ? durCache[t.url] : null);
+      allTracks.push({ name:t.name, url:t.url, ext:t.ext, plIdx:pi, duration:dur });
     });
   });
 }
