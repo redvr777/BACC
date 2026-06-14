@@ -48,7 +48,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .view-tab.active{color:var(--gold);background:var(--bg);border-bottom:2px solid var(--gold);}
 .view-tab .qcount{color:var(--pink);}
 
-/* TOOLBAR (shuffle / clear queue) */
+/* TOOLBAR (clear queue) */
 .toolbar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg);border-bottom:1px solid var(--border);}
 .tool-btn{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);background:var(--aglow);border:1px solid var(--border2);border-radius:2px;padding:6px 9px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:color .1s,border-color .1s;}
 .tool-btn:hover{color:var(--accent);border-color:var(--accent);}
@@ -108,7 +108,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
 .prog{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
 .time{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--muted);min-width:32px;text-align:center;flex-shrink:0;}
 .prog input{flex:1;}
-.transport{display:flex;align-items:center;justify-content:center;gap:14px;}
+.transport{display:flex;align-items:center;justify-content:center;gap:10px;}
 .tbtn{background:var(--aglow);border:2px solid var(--border2);color:var(--text);border-radius:2px;width:44px;height:44px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color .1s,color .1s,transform .1s;}
 .tbtn:hover{border-color:var(--accent);color:var(--accent);}
 .tbtn:active{transform:scale(.9);}
@@ -125,6 +125,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
   .bar-vol{display:none;}
   .tbtn{width:38px;height:38px;font-size:14px;}
   .tbtn.pp{width:48px;height:48px;font-size:18px;}
+  .transport{gap:6px;}
   .track .tname{font-size:20px;}
 }
 </style>
@@ -152,7 +153,6 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
   </div>
 
   <div class="toolbar" id="toolbar">
-    <button class="tool-btn shuffle" id="btnShuffle">🔀 SHUFFLE</button>
     <div class="tool-spacer"></div>
     <button class="tool-btn danger-tool" id="btnClearQ" style="display:none;">🗑 CLEAR QUEUE</button>
   </div>
@@ -179,6 +179,7 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
       <span class="time" id="tDur">0:00</span>
     </div>
     <div class="transport">
+      <button class="tbtn shuffle" id="btnShuffle" title="Shuffle">🔀</button>
       <button class="tbtn" id="btnPrev" title="Previous">⏮</button>
       <button class="tbtn pp" id="btnPP" title="Play / Pause">▶</button>
       <button class="tbtn" id="btnNext" title="Next">⏭</button>
@@ -266,6 +267,28 @@ function fmt(s){ if(!s||isNaN(s))return'0:00'; var m=Math.floor(s/60),sec=Math.f
 function extOf(p){ return(p.split('.').pop()||'').toLowerCase(); }
 function cleanName(p){ var n=p.split('/').pop().replace(/\.[^.]+$/,''); return decodeURIComponent(n).replace(/[_+]/g,' '); }
 function rawUrl(repo, branch, path){ return 'https://raw.githubusercontent.com/'+repo+'/'+branch+'/'+encodeURI(path); }
+
+// ── DOWNLOAD HELPER ──
+function downloadTrack(globalIdx){
+  var t=allTracks[globalIdx];
+  if(!t) return;
+  fetch(t.url)
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.blob(); })
+    .then(function(blob){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download=t.name+'.'+t.ext;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    })
+    .catch(function(){
+      // fallback: open in new tab if fetch/blob fails (e.g. CORS)
+      window.open(t.url, '_blank');
+    });
+}
 
 // ── TABS (playlists) ──
 function buildTabs(){
@@ -391,6 +414,16 @@ function buildTrackMenu(globalIdx){
   });
   dd.appendChild(playNext);
 
+  var dl=document.createElement('div');
+  dl.className='menu-dd-item';
+  dl.innerHTML='⬇ Download';
+  dl.addEventListener('click', function(e){
+    e.stopPropagation();
+    downloadTrack(globalIdx);
+    closeMenus();
+  });
+  dd.appendChild(dl);
+
   return dd;
 }
 
@@ -421,6 +454,17 @@ function buildQueueMenu(qPos){
     down.addEventListener('click', function(e){ e.stopPropagation(); moveQueueItem(qPos,1); closeMenus(); });
   }
   dd.appendChild(down);
+
+  var globalIdx=queue[qPos];
+  var dl=document.createElement('div');
+  dl.className='menu-dd-item';
+  dl.innerHTML='⬇ Download';
+  dl.addEventListener('click', function(e){
+    e.stopPropagation();
+    downloadTrack(globalIdx);
+    closeMenus();
+  });
+  dd.appendChild(dl);
 
   var rem=document.createElement('div');
   rem.className='menu-dd-item danger';
