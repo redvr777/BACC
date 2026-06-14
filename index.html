@@ -248,57 +248,48 @@ var shuffleOn=false;
 var queue=[];
 
 // ── DURATION PRELOADER ──
-// A single hidden audio element used ONLY for probing metadata.
-// We walk through tracks sequentially so we don't hammer the network.
-var probeAud = new Audio();
-probeAud.preload = 'metadata';
-var probeQueue = []; // { globalIdx } items waiting to be probed
-var probeRunning = false;
+// 3 concurrent probe workers so durations fill in quickly without hammering the network.
+var PROBE_CONCURRENCY = 3;
+var probeQueue = [];
+var probeActive = 0;
 
 function enqueueDurationProbe(globalIdx){
   probeQueue.push(globalIdx);
-  if(!probeRunning) drainProbeQueue();
+  fillProbeSlots();
 }
 
-function drainProbeQueue(){
-  if(!probeQueue.length){ probeRunning=false; return; }
-  probeRunning=true;
-  var idx = probeQueue.shift();
-  var t = allTracks[idx];
-  if(!t || t.duration!=null){ drainProbeQueue(); return; }
-
-  var done=false;
-  function finish(){
-    if(done) return;
-    done=true;
-    probeAud.onloadedmetadata=null;
-    probeAud.onerror=null;
-    drainProbeQueue();
+function fillProbeSlots(){
+  while(probeActive < PROBE_CONCURRENCY && probeQueue.length){
+    runProbe(probeQueue.shift());
   }
+}
 
-  probeAud.onloadedmetadata=function(){
-    var d=probeAud.duration;
-    if(d && isFinite(d)){
-      t.duration=d;
-      // update any visible duration element
-      var el=document.getElementById('tdur-'+idx);
-      if(el){ el.textContent=fmt(d); el.classList.remove('loading'); }
+function runProbe(idx){
+  var t = allTracks[idx];
+  if(!t || t.duration != null){ fillProbeSlots(); return; }
+  probeActive++;
+  var a = new Audio();
+  a.preload = 'metadata';
+  var done = false;
+  function finish(dur){
+    if(done) return; done=true;
+    a.onloadedmetadata = null; a.onerror = null; a.src = '';
+    t.duration = (dur && isFinite(dur)) ? dur : 0;
+    if(t.duration > 0){
+      var el = document.getElementById('tdur-'+idx);
+      if(el){ el.textContent = fmt(t.duration); el.classList.remove('loading'); }
     } else {
-      t.duration=0;
+      var el = document.getElementById('tdur-'+idx);
+      if(el){ el.textContent = '--:--'; el.classList.remove('loading'); }
     }
-    finish();
-  };
-  probeAud.onerror=function(){
-    t.duration=0;
-    finish();
-  };
-  // Set a timeout in case neither event fires (some servers block range requests)
-  setTimeout(function(){
-    if(!done){ t.duration=0; finish(); }
-  }, 8000);
-
-  probeAud.src=t.url;
-  probeAud.load();
+    probeActive--;
+    fillProbeSlots();
+  }
+  a.onloadedmetadata = function(){ finish(a.duration); };
+  a.onerror = function(){ finish(0); };
+  setTimeout(function(){ if(!done) finish(0); }, 8000);
+  a.src = t.url;
+  a.load();
 }
 
 var aud       = document.getElementById('aud');
@@ -623,36 +614,52 @@ function getPrevIndex(){
 }
 
 // ── LOAD PLAYLIST ──
+// Tries 'main' branch first, then 'master', each counting as one attempt.
+// Up to MAX_RETRIES total attempts before giving up.
+var MAX_RETRIES = 5;
+
 function loadPlaylist(pi){
-  var pl=plData[pi]; var info=pl.info; var branch=info.branch||'main';
-  function tryFetch(br){
+  var pl = plData[pi];
+  var info = pl.info;
+  var branches = (info.branch && info.branch !== 'main') ? [info.branch, 'main', 'master'] : ['main', 'master'];
+  var attempt = 0;
+
+  function tryNext(){
+    if(attempt >= MAX_RETRIES){
+      pl.error = true; pl.loaded = true;
+      rebuildAllTracks(); updateStatus();
+      if(currentView==='tracks' && activeTab===pi) renderList();
+      return;
+    }
+    var br = attempt < branches.length ? branches[attempt] : branches[branches.length-1];
+    attempt++;
+
+    if(attempt > 2) setStatus('', 'Retrying '+info.name+' ('+attempt+'/'+MAX_RETRIES+')...');
+
     fetch('https://api.github.com/repos/'+info.repo+'/git/trees/'+br+'?recursive=1')
       .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
       .then(function(data){
         if(!data.tree) throw new Error('No tree');
-        pl.tracks=[];
+        pl.tracks = [];
         data.tree.forEach(function(item){
-          if(item.type!=='blob') return;
-          var ext=extOf(item.path);
-          if(EXTS.indexOf(ext)===-1) return;
+          if(item.type !== 'blob') return;
+          var ext = extOf(item.path);
+          if(EXTS.indexOf(ext) === -1) return;
           pl.tracks.push({ name:cleanName(item.path), url:rawUrl(info.repo,br,item.path), ext:ext, duration:null });
         });
-        pl.loaded=true;
-        rebuildAllTracks();
-        updateStatus();
-        if(currentView==='tracks'&&activeTab===pi) renderList();
-        // Schedule duration probes for all tracks in this playlist
-        var offset=0; for(var x=0;x<pi;x++) offset+=plData[x].tracks.length;
+        pl.loaded = true;
+        rebuildAllTracks(); updateStatus();
+        if(currentView==='tracks' && activeTab===pi) renderList();
+        var offset = 0; for(var x=0;x<pi;x++) offset += plData[x].tracks.length;
         for(var j=0;j<pl.tracks.length;j++) enqueueDurationProbe(offset+j);
       })
       .catch(function(){
-        if(br==='main'){ tryFetch('master'); return; }
-        pl.error=true; pl.loaded=true;
-        rebuildAllTracks(); updateStatus();
-        if(currentView==='tracks'&&activeTab===pi) renderList();
+        var delay = Math.min(1000 * Math.pow(2, attempt-1), 8000);
+        setTimeout(tryNext, delay);
       });
   }
-  tryFetch(branch);
+
+  tryNext();
 }
 
 function updateStatus(){
