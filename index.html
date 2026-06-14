@@ -231,10 +231,6 @@ var shuffleOn=false;
 var queue=[];
 
 // ── GLOBAL DURATION CACHE (url → seconds) ──
-// Lives outside allTracks so it survives every rebuildAllTracks() call.
-// null   = not yet probed
-// 0      = probed, no readable duration
-// N > 0  = known duration in seconds
 var durCache = {};
 
 // ── DURATION PRELOADER ──
@@ -257,7 +253,6 @@ function runProbe(idx){
   var t = allTracks[idx];
   if(!t){ fillProbeSlots(); return; }
 
-  // Already have it in the persistent cache — just apply and move on
   if(durCache[t.url] !== undefined){
     t.duration = durCache[t.url];
     updateDurEl(idx, t.duration);
@@ -274,9 +269,7 @@ function runProbe(idx){
     if(done) return; done = true;
     a.onloadedmetadata = null; a.onerror = null; a.src = '';
     var d = (dur && isFinite(dur) && dur > 0) ? dur : 0;
-    // Write to persistent cache first
     durCache[t.url] = d;
-    // Then update the live track object (may have been rebuilt)
     if(allTracks[idx] && allTracks[idx].url === t.url) allTracks[idx].duration = d;
     updateDurEl(idx, d);
     probeActive--;
@@ -390,8 +383,6 @@ viewTabs.querySelectorAll('.view-tab').forEach(function(t){
   t.addEventListener('click',function(){ currentView=t.dataset.view; updateViewTabs(); renderList(); });
 });
 
-// ── FLAT LIST ──
-// Pulls duration from the persistent durCache so rebuilds never lose probed data.
 function rebuildAllTracks(){
   allTracks=[];
   plData.forEach(function(pl,pi){
@@ -495,10 +486,6 @@ function runSearch(){
 searchInput.addEventListener('input',runSearch);
 searchInput.addEventListener('focus',runSearch);
 
-// ── DURATION DISPLAY HELPER ──
-// duration === null  → still loading (show '…' dimmed)
-// duration === 0     → probed, unreadable (show '--:--')
-// duration > 0       → known (show formatted time)
 function durDisplay(at){
   if(!at || at.duration === null) return { text:'…', loading:true };
   if(at.duration > 0)            return { text:fmt(at.duration), loading:false };
@@ -649,7 +636,6 @@ function loadPlaylist(pi){
         pl.loaded = true;
         rebuildAllTracks(); updateStatus();
         if(currentView==='tracks' && activeTab===pi) renderList();
-        // Probe durations — runProbe skips anything already in durCache
         var offset = 0; for(var x=0;x<pi;x++) offset += plData[x].tracks.length;
         for(var j=0;j<pl.tracks.length;j++) enqueueDurationProbe(offset+j);
       })
@@ -689,6 +675,28 @@ function restoreState(){
   buildTabs(); renderList();
 }
 
+// ── Media Session API for lock screen / background controls ──
+function updateMediaSession(trackIdx){
+  if(!('mediaSession' in navigator)) return;
+  var t = allTracks[trackIdx]; if(!t) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: t.name,
+    artist: PLAYLISTS[t.plIdx].name,
+    album: 'Yuza'
+  });
+  navigator.mediaSession.setActionHandler('play', function(){ aud.play(); });
+  navigator.mediaSession.setActionHandler('pause', function(){ aud.pause(); });
+  navigator.mediaSession.setActionHandler('previoustrack', function(){
+    var pi=getPrevIndex(); if(pi>=0) playTrack(pi);
+  });
+  navigator.mediaSession.setActionHandler('nexttrack', function(){
+    var ni=getNextIndex(); if(ni>=0) playTrack(ni);
+  });
+  navigator.mediaSession.setActionHandler('seekto', function(d){
+    if(d.seekTime != null){ aud.currentTime=d.seekTime; }
+  });
+}
+
 aud.addEventListener('loadedmetadata',function(){
   seek.max=aud.duration||0; tDur.textContent=fmt(aud.duration);
   if(cur>=0 && allTracks[cur] && aud.duration > 0){
@@ -698,11 +706,41 @@ aud.addEventListener('loadedmetadata',function(){
     updateDurEl(cur, aud.duration);
   }
   if(pendingSeek>0&&pendingSeek<aud.duration){ aud.currentTime=pendingSeek; seek.value=pendingSeek; tCur.textContent=fmt(pendingSeek); pendingSeek=-1; }
+  // Update lock screen / notification controls
+  if(cur>=0) updateMediaSession(cur);
 });
-aud.addEventListener('play',function(){ btnPP.textContent='⏸'; renderList(); });
+aud.addEventListener('play',function(){
+  btnPP.textContent='⏸'; renderList();
+  if(cur>=0) updateMediaSession(cur);
+});
 aud.addEventListener('pause',function(){ btnPP.textContent='▶'; renderList(); saveState(); });
-aud.addEventListener('ended',function(){ if(aud.loop) return; var ni=getNextIndex(); if(ni>=0) playTrack(ni); });
-aud.addEventListener('timeupdate',function(){ if(!seeking){ seek.value=aud.currentTime; tCur.textContent=fmt(aud.currentTime); } });
+
+// ── FIX: background/lock-screen autoadvance ──
+// Use a small timeout so the browser has fully settled the ended state
+// before we attempt to load + play the next track. This is the key fix
+// for iOS/Android locking the screen — aud.play() called synchronously
+// inside 'ended' is often blocked in background contexts.
+aud.addEventListener('ended',function(){
+  if(aud.loop) return;
+  var ni=getNextIndex();
+  if(ni>=0){
+    setTimeout(function(){ playTrack(ni); }, 100);
+  }
+});
+
+aud.addEventListener('timeupdate',function(){
+  if(!seeking){ seek.value=aud.currentTime; tCur.textContent=fmt(aud.currentTime); }
+  // Keep lock screen scrubber in sync
+  if('mediaSession' in navigator && navigator.mediaSession.setPositionState && aud.duration > 0){
+    try{
+      navigator.mediaSession.setPositionState({
+        duration: aud.duration,
+        playbackRate: aud.playbackRate,
+        position: aud.currentTime
+      });
+    }catch(e){}
+  }
+});
 
 btnPP.addEventListener('click',function(){
   if(cur<0&&allTracks.length) return playTrack(0);
