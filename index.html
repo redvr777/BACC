@@ -19,11 +19,31 @@
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323',monospace;}
 .app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:var(--bg);position:relative;overflow:hidden;}
 
-.hero{flex-shrink:0;background:var(--bg2);border-bottom:2px solid var(--border2);padding:18px 20px 14px;display:flex;flex-direction:column;align-items:center;gap:12px;}
+.hero{flex-shrink:0;background:var(--bg2);border-bottom:2px solid var(--border2);padding:18px 20px 14px;display:flex;flex-direction:column;align-items:center;gap:12px;position:relative;}
 .hero-art{width:120px;height:120px;background:var(--bg3);border:2px solid var(--border2);border-radius:2px;display:flex;align-items:center;justify-content:center;font-size:44px;box-shadow:4px 4px 0 #8b0033;flex-shrink:0;}
 .hero-info{text-align:center;}
 .hero-title{font-family:'Press Start 2P',monospace;font-size:10px;color:var(--text);line-height:1.7;margin-bottom:4px;letter-spacing:.02em;word-break:break-word;}
 .hero-sub{font-family:'VT323',monospace;font-size:17px;color:var(--pink);letter-spacing:.08em;text-shadow:0 0 8px var(--pink);}
+
+/* SEARCH (top right of hero) */
+.search-wrap{position:absolute;top:14px;right:14px;z-index:60;}
+.search-toggle{background:var(--aglow);border:2px solid var(--border2);color:var(--text);width:30px;height:30px;border-radius:2px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:color .1s,border-color .1s;}
+.search-toggle:hover{color:var(--accent);border-color:var(--accent);}
+.search-toggle.on{color:var(--accent);border-color:var(--accent);}
+.search-box{position:absolute;top:36px;right:0;width:200px;display:none;}
+.search-box.open{display:block;}
+.search-input{width:100%;font-family:'VT323',monospace;font-size:16px;color:var(--text);background:var(--bg3);border:2px solid var(--border2);border-radius:2px;padding:7px 9px;outline:none;}
+.search-input:focus{border-color:var(--accent);}
+.search-input::placeholder{color:var(--muted);}
+.search-results{margin-top:4px;background:var(--bg3);border:2px solid var(--border2);border-radius:2px;box-shadow:4px 4px 0 #8b0033;max-height:240px;overflow-y:auto;}
+.search-results::-webkit-scrollbar{width:3px;}
+.search-results::-webkit-scrollbar-thumb{background:var(--border2);}
+.search-result{padding:9px 10px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;}
+.search-result:last-child{border-bottom:none;}
+.search-result:hover{background:var(--bg2);}
+.search-result .srname{font-family:'VT323',monospace;font-size:18px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.search-result .srpl{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--muted);margin-top:3px;}
+.search-empty{padding:10px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);text-align:center;}
 
 /* PLAYLIST TABS */
 .pl-tabs{flex-shrink:0;display:flex;overflow-x:auto;border-bottom:2px solid var(--border2);background:var(--bg2);}
@@ -127,12 +147,20 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
   .tbtn.pp{width:48px;height:48px;font-size:18px;}
   .transport{gap:6px;}
   .track .tname{font-size:20px;}
+  .search-box{width:160px;}
 }
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
+    <div class="search-wrap" id="searchWrap">
+      <button class="search-toggle" id="searchToggle" title="Search">🔍</button>
+      <div class="search-box" id="searchBox">
+        <input type="text" class="search-input" id="searchInput" placeholder="Search songs…" autocomplete="off">
+        <div class="search-results" id="searchResults" style="display:none;"></div>
+      </div>
+    </div>
     <div class="hero-art" id="heroArt">🌅</div>
     <div class="hero-info">
       <div class="hero-title" id="heroTitle">Select a track</div>
@@ -202,6 +230,8 @@ var PLAYLISTS = [
   { name: 'BACC',         repo: 'redvr777/BACC',       branch: 'main', emoji: '🌅' },
   { name: 'armands-songs',         repo: 'redvr777/armands-songs',       branch: 'main', emoji: '🦥' },
   { name: 'cades-music',         repo: 'redvr777/cades-music',       branch: 'main', emoji: '🐿️' },
+    { name: 'brian',         repo: 'redvr777/brian',       branch: 'main', emoji: '🧠' },
+      { name: 'chera',         repo: 'redvr777/chera',       branch: 'main', emoji: '🐈' },
 
 ];
 // ═══════════════════════════════════════════════════════════════
@@ -240,6 +270,11 @@ var statusTx  = document.getElementById('statusTx');
 var plTabs    = document.getElementById('plTabs');
 var viewTabs  = document.getElementById('viewTabs');
 var qcount    = document.getElementById('qcount');
+var searchWrap    = document.getElementById('searchWrap');
+var searchToggle  = document.getElementById('searchToggle');
+var searchBox     = document.getElementById('searchBox');
+var searchInput   = document.getElementById('searchInput');
+var searchResults = document.getElementById('searchResults');
 
 // ── STATE PERSISTENCE ──
 function saveState(){
@@ -386,6 +421,7 @@ function closeMenus(){
 }
 document.addEventListener('click', function(e){
   if(!e.target.closest('.menu-wrap')){ closeMenus(); }
+  if(!e.target.closest('.search-wrap')){ closeSearch(); }
 });
 
 function buildTrackMenu(globalIdx){
@@ -490,6 +526,88 @@ function attachMenu(wrap, builder){
   });
   wrap.appendChild(btn);
 }
+
+// ── SEARCH ──
+function closeSearch(){
+  searchBox.classList.remove('open');
+  searchToggle.classList.remove('on');
+  searchResults.style.display='none';
+  searchResults.innerHTML='';
+}
+searchToggle.addEventListener('click', function(e){
+  e.stopPropagation();
+  var isOpen=searchBox.classList.contains('open');
+  if(isOpen){
+    closeSearch();
+  } else {
+    searchBox.classList.add('open');
+    searchToggle.classList.add('on');
+    searchInput.value='';
+    searchResults.style.display='none';
+    searchResults.innerHTML='';
+    setTimeout(function(){ searchInput.focus(); }, 0);
+  }
+});
+searchBox.addEventListener('click', function(e){ e.stopPropagation(); });
+
+// fuzzy-ish match: true if query chars/words match name closely or as prefix/substring
+function matchesQuery(name, query){
+  var n=name.toLowerCase();
+  var q=query.toLowerCase().trim();
+  if(!q) return false;
+  if(n.indexOf(q)!==-1) return true; // direct substring anywhere
+  // word-prefix match: each query word should prefix-match some word in the name
+  var qWords=q.split(/\s+/);
+  var nWords=n.split(/[\s_\-]+/);
+  return qWords.every(function(qw){
+    return nWords.some(function(nw){ return nw.indexOf(qw)===0; });
+  });
+}
+
+function runSearch(){
+  var q=searchInput.value.trim();
+  searchResults.innerHTML='';
+  if(!q){
+    searchResults.style.display='none';
+    return;
+  }
+  var matches=[];
+  allTracks.forEach(function(t, idx){
+    if(matchesQuery(t.name, q)) matches.push(idx);
+  });
+  // prioritize matches that start with the query
+  var ql=q.toLowerCase();
+  matches.sort(function(a,b){
+    var an=allTracks[a].name.toLowerCase(), bn=allTracks[b].name.toLowerCase();
+    var aStart=an.indexOf(ql)===0?0:1;
+    var bStart=bn.indexOf(ql)===0?0:1;
+    if(aStart!==bStart) return aStart-bStart;
+    return an.length-bn.length;
+  });
+  matches=matches.slice(0,8);
+
+  searchResults.style.display='block';
+  if(!matches.length){
+    var empty=document.createElement('div');
+    empty.className='search-empty';
+    empty.textContent='No matches';
+    searchResults.appendChild(empty);
+    return;
+  }
+  matches.forEach(function(idx){
+    var t=allTracks[idx];
+    var div=document.createElement('div');
+    div.className='search-result';
+    div.innerHTML='<div class="srname">'+t.name+'</div><div class="srpl">'+PLAYLISTS[t.plIdx].name.toUpperCase()+'</div>';
+    div.addEventListener('click', function(){
+      playTrack(idx);
+      closeSearch();
+    });
+    searchResults.appendChild(div);
+  });
+}
+searchInput.addEventListener('input', runSearch);
+searchInput.addEventListener('focus', runSearch);
 
 // ── RENDER TRACK LIST ──
 function renderList(){
@@ -600,16 +718,22 @@ function playTrack(i, noPlay){
 }
 
 // ── NEXT TRACK LOGIC (queue > shuffle > sequential) ──
+// shuffle is scoped to the playlist of the currently playing track
 function getNextIndex(){
   // 1. queue takes priority
   if(queue.length){
     return playFromQueueNext();
   }
-  // 2. shuffle
+  // 2. shuffle (within current track's playlist)
   if(shuffleOn && allTracks.length>1){
-    var r;
-    do{ r=Math.floor(Math.random()*allTracks.length); }while(r===cur);
-    return r;
+    var plIdx = (cur>=0 && allTracks[cur]) ? allTracks[cur].plIdx : activeTab;
+    var candidates=[];
+    allTracks.forEach(function(t,i){ if(t.plIdx===plIdx && i!==cur) candidates.push(i); });
+    if(candidates.length){
+      return candidates[Math.floor(Math.random()*candidates.length)];
+    }
+    // fallback: only one track in this playlist, just replay it
+    if(cur>=0) return cur;
   }
   // 3. sequential
   if(!allTracks.length) return -1;
@@ -617,9 +741,13 @@ function getNextIndex(){
 }
 function getPrevIndex(){
   if(shuffleOn && allTracks.length>1){
-    var r;
-    do{ r=Math.floor(Math.random()*allTracks.length); }while(r===cur);
-    return r;
+    var plIdx = (cur>=0 && allTracks[cur]) ? allTracks[cur].plIdx : activeTab;
+    var candidates=[];
+    allTracks.forEach(function(t,i){ if(t.plIdx===plIdx && i!==cur) candidates.push(i); });
+    if(candidates.length){
+      return candidates[Math.floor(Math.random()*candidates.length)];
+    }
+    if(cur>=0) return cur;
   }
   if(!allTracks.length) return -1;
   return cur<=0?allTracks.length-1:cur-1;
