@@ -76,7 +76,28 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .tlist::-webkit-scrollbar-track{background:var(--bg2);}
 .tlist::-webkit-scrollbar-thumb{background:var(--border2);}
 
+/* ── Folder section headers ── */
+.folder-header{
+  display:flex;align-items:center;gap:8px;
+  font-family:'Press Start 2P',monospace;font-size:7px;
+  color:var(--gold);letter-spacing:.06em;
+  padding:14px 4px 6px;
+  border-bottom:2px solid var(--border2);
+  margin-bottom:2px;
+  cursor:pointer;
+  user-select:none;
+}
+.folder-header:first-child{padding-top:6px;}
+.folder-icon{font-size:13px;flex-shrink:0;}
+.folder-chevron{margin-left:auto;font-size:11px;color:var(--muted);transition:transform .15s;}
+.folder-header.collapsed .folder-chevron{transform:rotate(-90deg);}
+.folder-header .folder-count{font-family:'VT323',monospace;font-size:15px;color:var(--muted);}
+
+/* Root-level playlist header (no folder) */
 .pl-section-header{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--pink);letter-spacing:.06em;padding:12px 4px 6px;border-bottom:1px solid var(--border2);margin-bottom:2px;}
+
+.folder-tracks{}
+.folder-tracks.collapsed{display:none;}
 
 .track{display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;border-radius:2px;position:relative;}
 .track:hover{background:var(--bg2);}
@@ -94,6 +115,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .track .tdur{font-family:'VT323',monospace;font-size:16px;color:var(--muted);letter-spacing:.04em;}
 .track.playing .tdur{color:var(--gold);}
 .track .tdur.loading{opacity:.35;}
+/* indent tracks that are inside a folder */
+.track.in-folder{padding-left:28px;}
 
 .empty{text-align:center;padding:40px 16px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);line-height:2.2;}
 
@@ -221,8 +244,9 @@ var PLAYLISTS = [
 ];
 
 var EXTS=['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
-var STORE_KEY='yuza_state_v3';
+var STORE_KEY='yuza_state_v4';
 
+// plData tracks are now: { name, url, ext, folder } where folder is '' for root-level files
 var plData = PLAYLISTS.map(function(p){ return { info:p, tracks:[], loaded:false, error:false }; });
 var allTracks = [];
 var cur=-1, seeking=false, pendingSeek=-1, activeTab=0;
@@ -230,7 +254,10 @@ var currentView='tracks';
 var shuffleOn=false;
 var queue=[];
 
-// ── GLOBAL DURATION CACHE (url → seconds) ──
+// folder collapse state: key = "plIdx:folderName"
+var folderCollapsed = {};
+
+// ── GLOBAL DURATION CACHE ──
 var durCache = {};
 
 // ── DURATION PRELOADER ──
@@ -242,29 +269,24 @@ function enqueueDurationProbe(globalIdx){
   probeQueue.push(globalIdx);
   fillProbeSlots();
 }
-
 function fillProbeSlots(){
   while(probeActive < PROBE_CONCURRENCY && probeQueue.length){
     runProbe(probeQueue.shift());
   }
 }
-
 function runProbe(idx){
   var t = allTracks[idx];
   if(!t){ fillProbeSlots(); return; }
-
   if(durCache[t.url] !== undefined){
     t.duration = durCache[t.url];
     updateDurEl(idx, t.duration);
     fillProbeSlots();
     return;
   }
-
   probeActive++;
   var a = new Audio();
   a.preload = 'metadata';
   var done = false;
-
   function finish(dur){
     if(done) return; done = true;
     a.onloadedmetadata = null; a.onerror = null; a.src = '';
@@ -275,14 +297,12 @@ function runProbe(idx){
     probeActive--;
     fillProbeSlots();
   }
-
   a.onloadedmetadata = function(){ finish(a.duration); };
   a.onerror          = function(){ finish(0); };
   setTimeout(function(){ if(!done) finish(0); }, 8000);
   a.src = t.url;
   a.load();
 }
-
 function updateDurEl(idx, dur){
   var el = document.getElementById('tdur-'+idx);
   if(!el) return;
@@ -324,7 +344,7 @@ function saveState(){
     localStorage.setItem(STORE_KEY, JSON.stringify({
       cur:cur, time:aud.currentTime||0,
       volume:aud.volume, loop:aud.loop, tab:activeTab,
-      shuffle:shuffleOn, queue:queue
+      shuffle:shuffleOn, queue:queue, folderCollapsed:folderCollapsed
     }));
   }catch(e){}
 }
@@ -343,6 +363,36 @@ function fmt(s){ if(!s||isNaN(s))return'0:00'; var m=Math.floor(s/60),sec=Math.f
 function extOf(p){ return(p.split('.').pop()||'').toLowerCase(); }
 function cleanName(p){ var n=p.split('/').pop().replace(/\.[^.]+$/,''); return decodeURIComponent(n).replace(/[_+]/g,' '); }
 function rawUrl(repo,branch,path){ return 'https://raw.githubusercontent.com/'+repo+'/'+branch+'/'+encodeURI(path); }
+
+// ── FOLDER HELPERS ──
+// Returns the top-level folder name (first path segment) or '' for root files.
+function folderOf(path){
+  var parts = path.split('/');
+  return parts.length > 1 ? decodeURIComponent(parts[0]) : '';
+}
+
+// Group tracks by folder; preserves insertion order.
+function groupByFolder(tracks){
+  var groups = [];    // [{folder:'', tracks:[...]}, ...]
+  var index  = {};    // folder -> group ref
+  tracks.forEach(function(t){
+    var f = t.folder;
+    if(!index[f]){ var g={folder:f,tracks:[]}; groups.push(g); index[f]=g; }
+    index[f].tracks.push(t);
+  });
+  return groups;
+}
+
+function folderKey(plIdx, folderName){ return plIdx+':'+folderName; }
+function isFolderCollapsed(plIdx, folderName){
+  return !!folderCollapsed[folderKey(plIdx, folderName)];
+}
+function toggleFolder(plIdx, folderName){
+  var k = folderKey(plIdx, folderName);
+  folderCollapsed[k] = !folderCollapsed[k];
+  saveState();
+  renderList();
+}
 
 function downloadTrack(globalIdx){
   var t=allTracks[globalIdx]; if(!t) return;
@@ -390,6 +440,7 @@ function rebuildAllTracks(){
       var cached = durCache[t.url];
       allTracks.push({
         name: t.name, url: t.url, ext: t.ext, plIdx: pi,
+        folder: t.folder,
         duration: (cached !== undefined) ? cached : null
       });
     });
@@ -478,7 +529,8 @@ function runSearch(){
   matches.forEach(function(idx){
     var t=allTracks[idx];
     var div=document.createElement('div'); div.className='search-result';
-    div.innerHTML='<div class="srname">'+t.name+'</div><div class="srpl">'+PLAYLISTS[t.plIdx].name.toUpperCase()+'</div>';
+    var sub = PLAYLISTS[t.plIdx].name + (t.folder ? ' / '+t.folder : '');
+    div.innerHTML='<div class="srname">'+t.name+'</div><div class="srpl">'+sub.toUpperCase()+'</div>';
     div.addEventListener('click',function(){ playTrack(idx); closeSearch(); });
     searchResults.appendChild(div);
   });
@@ -492,6 +544,27 @@ function durDisplay(at){
   return                                { text:'--:--', loading:false };
 }
 
+// ── BUILD A SINGLE TRACK ROW ──
+function makeTrackEl(globalIdx, localNum, inFolder){
+  var at  = allTracks[globalIdx];
+  var dd  = durDisplay(at);
+  var div = document.createElement('div');
+  div.className = 'track'+(globalIdx===cur?' playing':'')+(inFolder?' in-folder':'');
+  div.innerHTML =
+    '<span class="num">'+(localNum<10?'0'+localNum:localNum)+'</span>'+
+    '<span class="ico">'+(globalIdx===cur&&!aud.paused?'⏸':'▶')+'</span>'+
+    '<div class="track-info"><div class="tname">'+at.name+'</div></div>'+
+    '<div class="track-meta">'+
+      '<span class="ext">'+at.ext+'</span>'+
+      '<span class="tdur'+(dd.loading?' loading':'')+'" id="tdur-'+globalIdx+'">'+dd.text+'</span>'+
+    '</div>';
+  div.addEventListener('click',function(){ playTrack(globalIdx); });
+  var wrap=document.createElement('div'); wrap.className='menu-wrap';
+  attachMenu(wrap,(function(gi){ return function(){ return buildTrackMenu(gi); }; })(globalIdx));
+  div.appendChild(wrap);
+  return div;
+}
+
 function renderList(){
   closeMenus();
   tlist.innerHTML='';
@@ -502,34 +575,48 @@ function renderList(){
   if(pl.error){ var d=document.createElement('div');d.className='empty';d.textContent='Could not load this playlist.';tlist.appendChild(d);return; }
   if(!pl.tracks.length){ var d=document.createElement('div');d.className='empty';d.textContent='No audio files found.';tlist.appendChild(d);return; }
 
-  var header=document.createElement('div'); header.className='pl-section-header';
-  header.textContent='— '+PLAYLISTS[activeTab].name.toUpperCase()+' —';
-  tlist.appendChild(header);
-
+  // compute global offset for this playlist
   var offset=0;
   for(var pi=0;pi<activeTab;pi++) offset+=plData[pi].tracks.length;
 
-  pl.tracks.forEach(function(t,i){
-    var globalIdx=offset+i;
-    var at=allTracks[globalIdx];
-    var dd=durDisplay(at);
+  var groups = groupByFolder(pl.tracks);
 
-    var div=document.createElement('div');
-    div.className='track'+(globalIdx===cur?' playing':'');
-    div.innerHTML=
-      '<span class="num">'+(i+1<10?'0'+(i+1):i+1)+'</span>'+
-      '<span class="ico">'+(globalIdx===cur&&!aud.paused?'⏸':'▶')+'</span>'+
-      '<div class="track-info"><div class="tname">'+t.name+'</div></div>'+
-      '<div class="track-meta">'+
-        '<span class="ext">'+t.ext+'</span>'+
-        '<span class="tdur'+(dd.loading?' loading':'')+'" id="tdur-'+globalIdx+'">'+dd.text+'</span>'+
-      '</div>';
-    div.addEventListener('click',function(){ playTrack(globalIdx); });
+  groups.forEach(function(group){
+    var isRootGroup = group.folder === '';
 
-    var wrap=document.createElement('div'); wrap.className='menu-wrap';
-    attachMenu(wrap,(function(gi){ return function(){ return buildTrackMenu(gi); }; })(globalIdx));
-    div.appendChild(wrap);
-    tlist.appendChild(div);
+    if(isRootGroup){
+      // Root-level tracks: show a plain playlist header
+      var header=document.createElement('div'); header.className='pl-section-header';
+      header.textContent='— '+PLAYLISTS[activeTab].name.toUpperCase()+' —';
+      tlist.appendChild(header);
+    } else {
+      // Folder header with collapse toggle
+      var collapsed = isFolderCollapsed(activeTab, group.folder);
+      var fh = document.createElement('div');
+      fh.className = 'folder-header' + (collapsed?' collapsed':'');
+      fh.innerHTML =
+        '<span class="folder-icon">📁</span>'+
+        '<span>'+group.folder.toUpperCase()+'</span>'+
+        '<span class="folder-count">'+group.tracks.length+'</span>'+
+        '<span class="folder-chevron">▾</span>';
+      (function(pi, fn){ fh.addEventListener('click', function(){ toggleFolder(pi, fn); }); })(activeTab, group.folder);
+      tlist.appendChild(fh);
+    }
+
+    // Tracks container (collapsible for folders)
+    var container = document.createElement('div');
+    container.className = 'folder-tracks' + ((!isRootGroup && isFolderCollapsed(activeTab, group.folder))?' collapsed':'');
+    tlist.appendChild(container);
+
+    group.tracks.forEach(function(t, i){
+      // find global index by matching url
+      var globalIdx = -1;
+      for(var x=offset; x<offset+pl.tracks.length; x++){
+        if(allTracks[x] && allTracks[x].url === t.url){ globalIdx=x; break; }
+      }
+      if(globalIdx<0) return;
+      container.appendChild(makeTrackEl(globalIdx, i+1, !isRootGroup));
+    });
   });
 }
 
@@ -542,10 +629,11 @@ function renderQueue(){
     var t=allTracks[globalIdx]; if(!t) return;
     var dd=durDisplay(t);
     var div=document.createElement('div');div.className='track';
+    var sub = PLAYLISTS[t.plIdx].name + (t.folder ? ' / '+t.folder : '');
     div.innerHTML=
       '<span class="num">'+(qPos+1<10?'0'+(qPos+1):qPos+1)+'</span>'+
       '<span class="ico">▶</span>'+
-      '<div class="track-info"><div class="tname">'+t.name+'</div><div class="tplname">'+PLAYLISTS[t.plIdx].name.toUpperCase()+'</div></div>'+
+      '<div class="track-info"><div class="tname">'+t.name+'</div><div class="tplname">'+sub.toUpperCase()+'</div></div>'+
       '<div class="track-meta">'+
         '<span class="ext">'+t.ext+'</span>'+
         '<span class="tdur'+(dd.loading?' loading':'')+'">'+dd.text+'</span>'+
@@ -566,17 +654,16 @@ function playTrack(i,noPlay){
   if(!noPlay){ aud.play().catch(function(){}); btnPP.textContent='⏸'; }
   else{ btnPP.textContent='▶'; }
   npName.textContent=t.name;
-  npPl.textContent=PLAYLISTS[t.plIdx].name;
+  var npSub = PLAYLISTS[t.plIdx].name + (t.folder ? ' / '+t.folder : '');
+  npPl.textContent=npSub;
   heroTitle.textContent=t.name;
-  heroSub.textContent=PLAYLISTS[t.plIdx].name;
+  heroSub.textContent=npSub;
   heroArt.textContent=PLAYLISTS[t.plIdx].emoji;
   if(currentView==='tracks'&&activeTab!==t.plIdx){ activeTab=t.plIdx; buildTabs(); }
   renderList();
   if(currentView==='tracks'){
-    var items=tlist.querySelectorAll('.track');
-    var offset=0; for(var pi=0;pi<t.plIdx;pi++) offset+=plData[pi].tracks.length;
-    var localIdx=i-offset;
-    if(items[localIdx]) items[localIdx].scrollIntoView({block:'nearest',behavior:'smooth'});
+    var el=document.getElementById('tdur-'+i);
+    if(el) el.closest('.track') && el.closest('.track').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
 }
 
@@ -631,7 +718,20 @@ function loadPlaylist(pi){
           if(item.type !== 'blob') return;
           var ext = extOf(item.path);
           if(EXTS.indexOf(ext) === -1) return;
-          pl.tracks.push({ name:cleanName(item.path), url:rawUrl(info.repo,br,item.path), ext:ext });
+          pl.tracks.push({
+            name: cleanName(item.path),
+            url: rawUrl(info.repo, br, item.path),
+            ext: ext,
+            folder: folderOf(item.path)   // ← capture folder name
+          });
+        });
+        // Sort: root tracks first, then alphabetically by folder, then by name within folder
+        pl.tracks.sort(function(a,b){
+          if(a.folder===''&&b.folder!=='') return -1;
+          if(a.folder!==''&&b.folder==='') return 1;
+          var fc=a.folder.localeCompare(b.folder);
+          if(fc!==0) return fc;
+          return a.name.localeCompare(b.name);
         });
         pl.loaded = true;
         rebuildAllTracks(); updateStatus();
@@ -660,6 +760,7 @@ function restoreState(){
   var s=loadState(); if(!s) return;
   if(s.shuffle){ shuffleOn=true; btnShuffle.classList.add('on'); }
   if(s.queue&&Array.isArray(s.queue)) queue=s.queue.filter(function(i){ return i>=0&&i<allTracks.length; });
+  if(s.folderCollapsed) folderCollapsed=s.folderCollapsed;
   updateViewTabs();
   if(s.cur==null||s.cur<0||s.cur>=allTracks.length){ renderList(); return; }
   if(s.loop){ aud.loop=true; btnLoop.classList.add('on'); }
@@ -669,19 +770,20 @@ function restoreState(){
   var t=allTracks[cur];
   aud.src=t.url;
   btnPP.textContent='▶';
-  npName.textContent=t.name; npPl.textContent=PLAYLISTS[t.plIdx].name;
-  heroTitle.textContent=t.name; heroSub.textContent=PLAYLISTS[t.plIdx].name;
+  var npSub = PLAYLISTS[t.plIdx].name + (t.folder ? ' / '+t.folder : '');
+  npName.textContent=t.name; npPl.textContent=npSub;
+  heroTitle.textContent=t.name; heroSub.textContent=npSub;
   heroArt.textContent=PLAYLISTS[t.plIdx].emoji;
   buildTabs(); renderList();
 }
 
-// ── Media Session API for lock screen / background controls ──
+// ── Media Session API ──
 function updateMediaSession(trackIdx){
   if(!('mediaSession' in navigator)) return;
   var t = allTracks[trackIdx]; if(!t) return;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: t.name,
-    artist: PLAYLISTS[t.plIdx].name,
+    artist: PLAYLISTS[t.plIdx].name + (t.folder ? ' / '+t.folder : ''),
     album: 'Yuza'
   });
   navigator.mediaSession.setActionHandler('play', function(){ aud.play(); });
@@ -706,7 +808,6 @@ aud.addEventListener('loadedmetadata',function(){
     updateDurEl(cur, aud.duration);
   }
   if(pendingSeek>0&&pendingSeek<aud.duration){ aud.currentTime=pendingSeek; seek.value=pendingSeek; tCur.textContent=fmt(pendingSeek); pendingSeek=-1; }
-  // Update lock screen / notification controls
   if(cur>=0) updateMediaSession(cur);
 });
 aud.addEventListener('play',function(){
@@ -714,30 +815,16 @@ aud.addEventListener('play',function(){
   if(cur>=0) updateMediaSession(cur);
 });
 aud.addEventListener('pause',function(){ btnPP.textContent='▶'; renderList(); saveState(); });
-
-// ── FIX: background/lock-screen autoadvance ──
-// Use a small timeout so the browser has fully settled the ended state
-// before we attempt to load + play the next track. This is the key fix
-// for iOS/Android locking the screen — aud.play() called synchronously
-// inside 'ended' is often blocked in background contexts.
 aud.addEventListener('ended',function(){
   if(aud.loop) return;
   var ni=getNextIndex();
-  if(ni>=0){
-    setTimeout(function(){ playTrack(ni); }, 100);
-  }
+  if(ni>=0){ setTimeout(function(){ playTrack(ni); }, 100); }
 });
-
 aud.addEventListener('timeupdate',function(){
   if(!seeking){ seek.value=aud.currentTime; tCur.textContent=fmt(aud.currentTime); }
-  // Keep lock screen scrubber in sync
   if('mediaSession' in navigator && navigator.mediaSession.setPositionState && aud.duration > 0){
     try{
-      navigator.mediaSession.setPositionState({
-        duration: aud.duration,
-        playbackRate: aud.playbackRate,
-        position: aud.currentTime
-      });
+      navigator.mediaSession.setPositionState({ duration:aud.duration, playbackRate:aud.playbackRate, position:aud.currentTime });
     }catch(e){}
   }
 });
