@@ -76,7 +76,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .tlist::-webkit-scrollbar-track{background:var(--bg2);}
 .tlist::-webkit-scrollbar-thumb{background:var(--border2);}
 
-/* ── Folder section headers ── */
 .folder-header{
   display:flex;align-items:center;gap:8px;
   font-family:'Press Start 2P',monospace;font-size:7px;
@@ -93,7 +92,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .folder-header.collapsed .folder-chevron{transform:rotate(-90deg);}
 .folder-header .folder-count{font-family:'VT323',monospace;font-size:15px;color:var(--muted);}
 
-/* Root-level playlist header (no folder) */
 .pl-section-header{font-family:'Press Start 2P',monospace;font-size:7px;color:var(--pink);letter-spacing:.06em;padding:12px 4px 6px;border-bottom:1px solid var(--border2);margin-bottom:2px;}
 
 .folder-tracks{}
@@ -115,7 +113,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .track .tdur{font-family:'VT323',monospace;font-size:16px;color:var(--muted);letter-spacing:.04em;}
 .track.playing .tdur{color:var(--gold);}
 .track .tdur.loading{opacity:.35;}
-/* indent tracks that are inside a folder */
+
 .track.in-folder{padding-left:28px;}
 
 .empty{text-align:center;padding:40px 16px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--muted);line-height:2.2;}
@@ -238,15 +236,14 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
 <script>
 var PLAYLISTS = [
   { name: 'armands-songs', repo: 'redvr777/armands-songs', branch: 'main', emoji: '🦥' },
-  { name: 'cades-music-v2',   repo: 'redvr777/cades-music-v2',   branch: 'main', emoji: '🐿️' },
-  { name: 'brian',         repo: 'redvr777/brian',         branch: 'main', emoji: '🧠' },
-  { name: 'chera',         repo: 'redvr777/chera',         branch: 'main', emoji: '🐈' },
+  { name: 'cades-music-v2', repo: 'redvr777/cades-music-v2', branch: 'main', emoji: '🐿️' },
+  { name: 'brian', repo: 'redvr777/brian', branch: 'main', emoji: '🧠' },
+  { name: 'chera', repo: 'redvr777/chera', branch: 'main', emoji: '🐈' },
 ];
 
 var EXTS=['mp3','wav','ogg','m4a','flac','aac','webm','opus','mov','mpeg','mpg'];
 var STORE_KEY='yuza_state_v4';
 
-// plData tracks are now: { name, url, ext, folder } where folder is '' for root-level files
 var plData = PLAYLISTS.map(function(p){ return { info:p, tracks:[], loaded:false, error:false }; });
 var allTracks = [];
 var cur=-1, seeking=false, pendingSeek=-1, activeTab=0;
@@ -254,13 +251,10 @@ var currentView='tracks';
 var shuffleOn=false;
 var queue=[];
 
-// folder collapse state: key = "plIdx:folderName"
 var folderCollapsed = {};
 
-// ── GLOBAL DURATION CACHE ──
 var durCache = {};
 
-// ── DURATION PRELOADER ──
 var PROBE_CONCURRENCY = 3;
 var probeQueue = [];
 var probeActive = 0;
@@ -298,7 +292,7 @@ function runProbe(idx){
     fillProbeSlots();
   }
   a.onloadedmetadata = function(){ finish(a.duration); };
-  a.onerror          = function(){ finish(0); };
+  a.onerror = function(){ finish(0); };
   setTimeout(function(){ if(!done) finish(0); }, 8000);
   a.src = t.url;
   a.load();
@@ -310,33 +304,33 @@ function updateDurEl(idx, dur){
   el.textContent = (dur > 0) ? fmt(dur) : '--:--';
 }
 
-var aud       = document.getElementById('aud');
-var tlist     = document.getElementById('tlist');
-var npName    = document.getElementById('npName');
-var npPl      = document.getElementById('npPl');
+var aud = document.getElementById('aud');
+var tlist = document.getElementById('tlist');
+var npName = document.getElementById('npName');
+var npPl = document.getElementById('npPl');
 var heroTitle = document.getElementById('heroTitle');
-var heroSub   = document.getElementById('heroSub');
-var heroArt   = document.getElementById('heroArt');
-var btnPP     = document.getElementById('btnPP');
-var btnPrev   = document.getElementById('btnPrev');
-var btnNext   = document.getElementById('btnNext');
-var btnLoop   = document.getElementById('btnLoop');
-var btnShuffle= document.getElementById('btnShuffle');
+var heroSub = document.getElementById('heroSub');
+var heroArt = document.getElementById('heroArt');
+var btnPP = document.getElementById('btnPP');
+var btnPrev = document.getElementById('btnPrev');
+var btnNext = document.getElementById('btnNext');
+var btnLoop = document.getElementById('btnLoop');
+var btnShuffle = document.getElementById('btnShuffle');
 var btnClearQ = document.getElementById('btnClearQ');
-var seek      = document.getElementById('seek');
-var tCur      = document.getElementById('tCur');
-var tDur      = document.getElementById('tDur');
-var vol       = document.getElementById('vol');
+var seek = document.getElementById('seek');
+var tCur = document.getElementById('tCur');
+var tDur = document.getElementById('tDur');
+var vol = document.getElementById('vol');
 var statusBar = document.getElementById('statusBar');
-var statusTx  = document.getElementById('statusTx');
-var plTabs    = document.getElementById('plTabs');
-var viewTabs  = document.getElementById('viewTabs');
-var qcount    = document.getElementById('qcount');
-var toolbar   = document.getElementById('toolbar');
-var searchWrap    = document.getElementById('searchWrap');
-var searchToggle  = document.getElementById('searchToggle');
-var searchBox     = document.getElementById('searchBox');
-var searchInput   = document.getElementById('searchInput');
+var statusTx = document.getElementById('statusTx');
+var plTabs = document.getElementById('plTabs');
+var viewTabs = document.getElementById('viewTabs');
+var qcount = document.getElementById('qcount');
+var toolbar = document.getElementById('toolbar');
+var searchWrap = document.getElementById('searchWrap');
+var searchToggle = document.getElementById('searchToggle');
+var searchBox = document.getElementById('searchBox');
+var searchInput = document.getElementById('searchInput');
 var searchResults = document.getElementById('searchResults');
 
 function saveState(){
@@ -364,17 +358,14 @@ function extOf(p){ return(p.split('.').pop()||'').toLowerCase(); }
 function cleanName(p){ var n=p.split('/').pop().replace(/\.[^.]+$/,''); return decodeURIComponent(n).replace(/[_+]/g,' '); }
 function rawUrl(repo,branch,path){ return 'https://raw.githubusercontent.com/'+repo+'/'+branch+'/'+encodeURI(path); }
 
-// ── FOLDER HELPERS ──
-// Returns the top-level folder name (first path segment) or '' for root files.
 function folderOf(path){
   var parts = path.split('/');
   return parts.length > 1 ? decodeURIComponent(parts[0]) : '';
 }
 
-// Group tracks by folder; preserves insertion order.
 function groupByFolder(tracks){
-  var groups = [];    // [{folder:'', tracks:[...]}, ...]
-  var index  = {};    // folder -> group ref
+  var groups = [];
+  var index = {};
   tracks.forEach(function(t){
     var f = t.folder;
     if(!index[f]){ var g={folder:f,tracks:[]}; groups.push(g); index[f]=g; }
@@ -461,8 +452,8 @@ function buildTrackMenu(globalIdx){
   var dd=document.createElement('div'); dd.className='menu-dd';
   var items=[
     ['➕ Add to queue', function(){ addToQueue(globalIdx); closeMenus(); }],
-    ['⏭ Play next',    function(){ queue.unshift(globalIdx); saveState(); updateViewTabs(); closeMenus(); }],
-    ['⬇ Download',     function(){ downloadTrack(globalIdx); closeMenus(); }],
+    ['⏭ Play next', function(){ queue.unshift(globalIdx); saveState(); updateViewTabs(); closeMenus(); }],
+    ['⬇ Download', function(){ downloadTrack(globalIdx); closeMenus(); }],
   ];
   items.forEach(function(it){
     var d=document.createElement('div'); d.className='menu-dd-item'; d.innerHTML=it[0];
@@ -478,8 +469,8 @@ function buildQueueMenu(qPos){
     dd.appendChild(d);
   }
   item('⤒ Move to top', qPos===0, function(){ moveQueueToTop(qPos); });
-  item('↑ Move up',     qPos===0, function(){ moveQueueItem(qPos,-1); });
-  item('↓ Move down',   qPos===queue.length-1, function(){ moveQueueItem(qPos,1); });
+  item('↑ Move up', qPos===0, function(){ moveQueueItem(qPos,-1); });
+  item('↓ Move down', qPos===queue.length-1, function(){ moveQueueItem(qPos,1); });
   item('⬇ Download', false, function(){ downloadTrack(queue[qPos]); });
   var rem=document.createElement('div'); rem.className='menu-dd-item danger'; rem.innerHTML='✕ Remove from queue';
   rem.addEventListener('click',function(e){ e.stopPropagation(); removeFromQueue(qPos); closeMenus(); });
@@ -540,14 +531,13 @@ searchInput.addEventListener('focus',runSearch);
 
 function durDisplay(at){
   if(!at || at.duration === null) return { text:'…', loading:true };
-  if(at.duration > 0)            return { text:fmt(at.duration), loading:false };
-  return                                { text:'--:--', loading:false };
+  if(at.duration > 0) return { text:fmt(at.duration), loading:false };
+  return { text:'--:--', loading:false };
 }
 
-// ── BUILD A SINGLE TRACK ROW ──
 function makeTrackEl(globalIdx, localNum, inFolder){
-  var at  = allTracks[globalIdx];
-  var dd  = durDisplay(at);
+  var at = allTracks[globalIdx];
+  var dd = durDisplay(at);
   var div = document.createElement('div');
   div.className = 'track'+(globalIdx===cur?' playing':'')+(inFolder?' in-folder':'');
   div.innerHTML =
@@ -575,7 +565,6 @@ function renderList(){
   if(pl.error){ var d=document.createElement('div');d.className='empty';d.textContent='Could not load this playlist.';tlist.appendChild(d);return; }
   if(!pl.tracks.length){ var d=document.createElement('div');d.className='empty';d.textContent='No audio files found.';tlist.appendChild(d);return; }
 
-  // compute global offset for this playlist
   var offset=0;
   for(var pi=0;pi<activeTab;pi++) offset+=plData[pi].tracks.length;
 
@@ -585,12 +574,10 @@ function renderList(){
     var isRootGroup = group.folder === '';
 
     if(isRootGroup){
-      // Root-level tracks: show a plain playlist header
       var header=document.createElement('div'); header.className='pl-section-header';
       header.textContent='— '+PLAYLISTS[activeTab].name.toUpperCase()+' —';
       tlist.appendChild(header);
     } else {
-      // Folder header with collapse toggle
       var collapsed = isFolderCollapsed(activeTab, group.folder);
       var fh = document.createElement('div');
       fh.className = 'folder-header' + (collapsed?' collapsed':'');
@@ -603,13 +590,11 @@ function renderList(){
       tlist.appendChild(fh);
     }
 
-    // Tracks container (collapsible for folders)
     var container = document.createElement('div');
     container.className = 'folder-tracks' + ((!isRootGroup && isFolderCollapsed(activeTab, group.folder))?' collapsed':'');
     tlist.appendChild(container);
 
     group.tracks.forEach(function(t, i){
-      // find global index by matching url
       var globalIdx = -1;
       for(var x=offset; x<offset+pl.tracks.length; x++){
         if(allTracks[x] && allTracks[x].url === t.url){ globalIdx=x; break; }
@@ -722,10 +707,10 @@ function loadPlaylist(pi){
             name: cleanName(item.path),
             url: rawUrl(info.repo, br, item.path),
             ext: ext,
-            folder: folderOf(item.path)   // ← capture folder name
+            folder: folderOf(item.path)
           });
         });
-        // Sort: root tracks first, then alphabetically by folder, then by name within folder
+
         pl.tracks.sort(function(a,b){
           if(a.folder===''&&b.folder!=='') return -1;
           if(a.folder!==''&&b.folder==='') return 1;
@@ -777,7 +762,6 @@ function restoreState(){
   buildTabs(); renderList();
 }
 
-// ── Media Session API ──
 function updateMediaSession(trackIdx){
   if(!('mediaSession' in navigator)) return;
   var t = allTracks[trackIdx]; if(!t) return;
