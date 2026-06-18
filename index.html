@@ -44,6 +44,24 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'VT323'
 .search-result .srpl{font-family:'Press Start 2P',monospace;font-size:6px;color:var(--muted);margin-top:3px;}
 .search-empty{padding:10px;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--muted);text-align:center;}
 
+.video-wrap{position:absolute;top:14px;left:14px;z-index:60;}
+.video-toggle{background:var(--aglow);border:2px solid var(--border2);color:var(--text);width:30px;height:30px;border-radius:2px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:color .1s,border-color .1s;}
+.video-toggle:hover{color:var(--accent);border-color:var(--accent);}
+.video-toggle.on{color:var(--accent);border-color:var(--accent);}
+.video-panel{position:absolute;top:36px;left:0;width:190px;display:none;background:var(--bg3);border:2px solid var(--border2);border-radius:2px;box-shadow:4px 4px 0 #8b0033;padding:8px;}
+.video-panel.open{display:block;}
+.video-form{display:flex;gap:6px;margin-bottom:8px;}
+.video-input{flex:1;min-width:0;font-family:'VT323',monospace;font-size:15px;color:var(--text);background:var(--bg);border:2px solid var(--border2);border-radius:2px;padding:6px 8px;outline:none;}
+.video-input:focus{border-color:var(--accent);}
+.video-input::placeholder{color:var(--muted);}
+.video-play-btn{font-family:'Press Start 2P',monospace;font-size:10px;background:var(--pink);color:#1a0822;border:none;border-radius:2px;width:30px;flex-shrink:0;cursor:pointer;transition:filter .1s;}
+.video-play-btn:hover{filter:brightness(1.1);}
+.video-play-btn:active{transform:translateY(1px);}
+.video-screen{position:relative;width:100%;aspect-ratio:16/9;background:#000;border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.video-screen iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;}
+.video-placeholder{font-size:24px;color:var(--muted);opacity:.45;pointer-events:none;}
+.video-error{margin:6px 0 0;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--pink);min-height:1em;line-height:1.5;}
+
 .pl-tabs{flex-shrink:0;display:flex;overflow-x:auto;border-bottom:2px solid var(--border2);background:var(--bg2);}
 .pl-tabs::-webkit-scrollbar{height:2px;}
 .pl-tabs::-webkit-scrollbar-thumb{background:var(--border2);}
@@ -164,12 +182,27 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:0;backg
   .transport{gap:6px;}
   .track .tname{font-size:20px;}
   .search-box{width:160px;}
+  .video-panel{width:150px;}
 }
 </style>
 </head>
 <body>
 <div class="app">
   <div class="hero">
+    <div class="video-wrap" id="videoWrap">
+      <button class="video-toggle" id="videoToggle" title="Video">🎬</button>
+      <div class="video-panel" id="videoPanel">
+        <form class="video-form" id="videoForm">
+          <input type="text" class="video-input" id="videoInput" placeholder="YouTube link…" autocomplete="off">
+          <button type="submit" class="video-play-btn" title="Play">▶</button>
+        </form>
+        <div class="video-screen" id="videoScreen">
+          <div id="ytTinyPlayer"></div>
+          <div class="video-placeholder" id="videoPlaceholder">📺</div>
+        </div>
+        <p class="video-error" id="videoError"></p>
+      </div>
+    </div>
     <div class="search-wrap" id="searchWrap">
       <button class="search-toggle" id="searchToggle" title="Search">🔍</button>
       <div class="search-box" id="searchBox">
@@ -332,6 +365,15 @@ var searchToggle = document.getElementById('searchToggle');
 var searchBox = document.getElementById('searchBox');
 var searchInput = document.getElementById('searchInput');
 var searchResults = document.getElementById('searchResults');
+var videoWrap = document.getElementById('videoWrap');
+var videoToggle = document.getElementById('videoToggle');
+var videoPanel = document.getElementById('videoPanel');
+var videoForm = document.getElementById('videoForm');
+var videoInput = document.getElementById('videoInput');
+var videoScreen = document.getElementById('videoScreen');
+var videoPlaceholder = document.getElementById('videoPlaceholder');
+var videoError = document.getElementById('videoError');
+var ytPlayer = null;
 
 function saveState(){
   try{
@@ -446,7 +488,7 @@ function clearQueue(){ queue=[]; saveState(); renderList(); updateViewTabs(); }
 function playFromQueueNext(){ if(!queue.length) return null; var idx=queue.shift(); saveState(); return idx; }
 
 function closeMenus(){ document.querySelectorAll('.menu-dd').forEach(function(m){ m.remove(); }); }
-document.addEventListener('click',function(e){ if(!e.target.closest('.menu-wrap')) closeMenus(); if(!e.target.closest('.search-wrap')) closeSearch(); });
+document.addEventListener('click',function(e){ if(!e.target.closest('.menu-wrap')) closeMenus(); if(!e.target.closest('.search-wrap')) closeSearch(); if(!e.target.closest('.video-wrap')) closeVideoPanel(); });
 
 function buildTrackMenu(globalIdx){
   var dd=document.createElement('div'); dd.className='menu-dd';
@@ -493,9 +535,96 @@ searchToggle.addEventListener('click',function(e){
   e.stopPropagation();
   var isOpen=searchBox.classList.contains('open');
   if(isOpen){ closeSearch(); }
-  else{ searchBox.classList.add('open'); searchToggle.classList.add('on'); searchInput.value=''; searchResults.style.display='none'; setTimeout(function(){ searchInput.focus(); },0); }
+  else{ closeVideoPanel(); searchBox.classList.add('open'); searchToggle.classList.add('on'); searchInput.value=''; searchResults.style.display='none'; setTimeout(function(){ searchInput.focus(); },0); }
 });
 searchBox.addEventListener('click',function(e){ e.stopPropagation(); });
+
+function closeVideoPanel(){
+  videoPanel.classList.remove('open');
+  videoToggle.classList.remove('on');
+  if(ytPlayer && typeof ytPlayer.pauseVideo==='function'){
+    try{ ytPlayer.pauseVideo(); }catch(e){}
+  }
+}
+videoToggle.addEventListener('click',function(e){
+  e.stopPropagation();
+  var isOpen=videoPanel.classList.contains('open');
+  if(isOpen){ closeVideoPanel(); }
+  else{ closeSearch(); videoPanel.classList.add('open'); videoToggle.classList.add('on'); setTimeout(function(){ videoInput.focus(); },0); }
+});
+videoPanel.addEventListener('click',function(e){ e.stopPropagation(); });
+
+function parseYouTubeId(raw){
+  var value=(raw||'').trim();
+  if(!value) return null;
+  if(/^[\w-]{11}$/.test(value)) return value;
+  try{
+    var url=new URL(value.indexOf('://')!==-1?value:'https://'+value);
+    var host=url.hostname.replace(/^www\./,'');
+    if(host==='youtu.be') return url.pathname.slice(1).split('/')[0]||null;
+    if(host==='youtube.com'||host==='m.youtube.com'){
+      if(url.pathname==='/watch') return url.searchParams.get('v');
+      var parts=url.pathname.split('/').filter(Boolean);
+      if(['embed','shorts','live'].indexOf(parts[0])!==-1) return parts[1]||null;
+    }
+  }catch(e){}
+  return null;
+}
+
+function ensureYouTubeAPI(callback){
+  if(window.YT&&window.YT.Player){ callback(); return; }
+  window.__ytApiCallbacks=window.__ytApiCallbacks||[];
+  window.__ytApiCallbacks.push(callback);
+  if(window.__ytApiLoading) return;
+  window.__ytApiLoading=true;
+  var prevReady=window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady=function(){
+    if(typeof prevReady==='function') prevReady();
+    var cbs=window.__ytApiCallbacks||[]; window.__ytApiCallbacks=[];
+    cbs.forEach(function(cb){ cb(); });
+  };
+  var s=document.createElement('script');
+  s.src='https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+
+var YT_ERROR_MESSAGES={
+  2:'Bad link.',
+  5:"Can't play here.",
+  100:'Removed or private.',
+  101:'Embedding disabled.',
+  150:'Embedding disabled.'
+};
+
+function playYouTubeVideo(id){
+  videoError.textContent='';
+  videoPlaceholder.style.display='none';
+  ensureYouTubeAPI(function(){
+    if(ytPlayer&&typeof ytPlayer.loadVideoById==='function'){
+      ytPlayer.loadVideoById(id);
+      return;
+    }
+    ytPlayer=new YT.Player('ytTinyPlayer',{
+      videoId:id,
+      width:'100%',
+      height:'100%',
+      playerVars:{ rel:0, modestbranding:1, playsinline:1, iv_load_policy:3 },
+      events:{
+        onReady:function(){ if(!aud.paused) aud.pause(); },
+        onStateChange:function(e){ if(e.data===YT.PlayerState.PLAYING&&!aud.paused) aud.pause(); },
+        onError:function(e){ videoPlaceholder.style.display='flex'; videoError.textContent=YT_ERROR_MESSAGES[e.data]||"Couldn't load that."; }
+      }
+    });
+  });
+}
+
+videoForm.addEventListener('submit',function(ev){
+  ev.preventDefault();
+  var id=parseYouTubeId(videoInput.value);
+  if(!id){ videoError.textContent='Paste a valid YouTube link.'; return; }
+  videoError.textContent='';
+  playYouTubeVideo(id);
+});
 
 function matchesQuery(name,query){
   var n=name.toLowerCase(),q=query.toLowerCase().trim();
